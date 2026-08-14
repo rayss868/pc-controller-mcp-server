@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pc-controller": {
+      "command": "node",
+      "args": ["D:\\All_project\\own\\AI_Coder\\MCP_Tools\\pc_controller\\dist\\index.js"]
+    }
+  }
+}
