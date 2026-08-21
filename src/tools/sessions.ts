@@ -7,9 +7,12 @@ export function registerSessionsTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "list_sessions",
-    `List all active terminal sessions managed by this server. Shows session ID,
-  creation time, and output line count. Use this to find sessions for interact_with_process.
-  Sessions are created by run_command_long and remain active until the process exits.`,
+    `List all active terminal sessions managed by this server. Each session represents
+  a long-running process (created by run_command_long or run_command) that is still
+  alive. Shows session ID, creation time, output line count, and alive status.
+  Use this to discover available sessions before reading their output with
+  read_process_output or sending input with interact_with_process. Sessions
+  automatically track stdout/stderr output and are removed when the process exits.`,
     {},
     async () => {
       const sessions = Array.from(activeSessions.entries()).map(([id, s]) => ({
@@ -44,9 +47,12 @@ export function registerSessionsTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "read_process_output",
-    `Read buffered output from a long-running session with offset and length
-  pagination. Use this to inspect output without flooding the context window.
-  Useful for reading build logs, checking command output, or monitoring process status.`,
+    `Read buffered output from a long-running terminal session with pagination.
+  Supports offset and length parameters to read specific ranges of output lines.
+  Use this to inspect build logs, check command output, or monitor process status
+  without flooding the context window with too much data. First call list_sessions
+  to find the session ID, then use offset=0 to read from the beginning, or set
+  a higher offset to skip past output you've already seen.`,
     {
       session_id: z
         .string()
@@ -100,9 +106,12 @@ export function registerSessionsTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "interact_with_process",
-    `Send input to a running interactive process (SSH sessions, database CLIs,
-  development servers). Use list_sessions to find session IDs. After sending input,
-  use read_process_output to see the response.`,
+    `Send input/commands to a running interactive terminal session. Use this to
+  interact with SSH sessions (send commands to remote servers), database CLIs
+  (run SQL queries in PostgreSQL, MySQL, etc.), development servers (send test
+  requests), or any process that reads from stdin. First call list_sessions to
+  find the session ID, then send input. After sending, use read_process_output
+  to see the response. The input is sent as a line followed by a newline character.`,
     {
       session_id: z
         .string()

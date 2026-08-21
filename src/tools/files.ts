@@ -630,9 +630,12 @@ export function registerFilesTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "create_directory",
-    `Create a new directory and any necessary parent directories. Equivalent to
-  'mkdir -p'. Does nothing if the directory already exists. Use this to set up
-  project structures or ensure folders exist before writing files.`,
+    `Create a new directory on this Windows PC, including any necessary parent
+  directories (equivalent to Unix 'mkdir -p'). Does nothing if the directory
+  already exists. Use this to set up project folder structures, ensure output
+  directories exist before writing files, or organize files into new folders.
+  Parent directories are created automatically — you only need to specify the
+  full target path.`,
     {
       path: z
         .string()
@@ -666,9 +669,12 @@ export function registerFilesTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "copy_file",
-    `Copy a file or directory to a new location. Parent directories are created
-  automatically. For directories, copies recursively. Use this to duplicate files,
-  create backups, or copy project templates.`,
+    `Copy a file or directory to a new location on this Windows PC. Parent
+  directories at the destination are created automatically if they don't exist.
+  For directories, the copy is performed recursively (all contents included).
+  Use this to duplicate files, create backups before editing, copy project
+  templates to new locations, or duplicate configuration files. The original
+  source is not modified or deleted.`,
     {
       source: z
         .string()
@@ -716,9 +722,13 @@ export function registerFilesTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "delete_file",
-    `Permanently delete a file or directory from this Windows PC. Use this tool
-  to remove temporary files, clean up build artifacts, or delete outdated data.
-  WARNING: Deleted files bypass the Recycle Bin and cannot be recovered.`,
+    `Permanently delete a file or directory from this Windows PC. WARNING: Deleted
+  files bypass the Recycle Bin and cannot be recovered — there is no undo.
+  For directories, use the recursive flag to delete non-empty folders and all
+  their contents. Use this to remove temporary files, clean up build artifacts,
+  delete outdated data, or free up disk space. Always verify the path before
+  calling this tool. Consider using file_move to move items to an archive
+  folder instead if you might need them later.`,
     {
       path: z
         .string()

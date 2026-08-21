@@ -10,9 +10,13 @@ export function registerAdminTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "config_get",
-    `Get the complete server configuration. Shows blocked commands, default shell,
-  allowed directories, file read/write limits. Use this to verify current settings
-  before making changes with config_set.`,
+    `Retrieve the complete runtime configuration of the PC Controller MCP server.
+  Returns the current values for all configurable settings: blockedCommands (list of
+  dangerous commands that are tracked), defaultShell (which shell is used for run_command:
+  powershell, gitbash, or wsl), fileReadLineLimit (max lines returned by file_read,
+  default 2000), and fileWriteLineLimit (max lines for file_write, default 2000).
+  Use this tool before calling config_set to see what values are currently active, or
+  to diagnose why a command might behave differently than expected (e.g., wrong shell).`,
     {},
     async () => {
       return {
@@ -32,8 +36,13 @@ export function registerAdminTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "config_set",
-    `Set a configuration value at runtime. Changes take effect immediately for
-  subsequent tool calls. Use config_get to see current settings first.`,
+    `Update a server configuration value at runtime. Changes take effect immediately
+  for all subsequent tool calls — no restart required. Use config_get first to see
+  the current settings before modifying them. Supported keys: "defaultShell" (change
+  between powershell/gitbash/wsl), "blockedCommands" (set list of blocked command
+  patterns as JSON array string), "fileReadLineLimit" (adjust max lines for file_read),
+  "fileWriteLineLimit" (adjust max lines for file_write). For array values like
+  blockedCommands, pass a JSON-serialized array string.`,
     {
       key: z
         .string()
@@ -89,9 +98,12 @@ export function registerAdminTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "get_usage_stats",
-    `Get usage statistics for the current server session. Shows per-tool call counts,
-  error rates, and last-used timestamps. Useful for auditing which tools were used
-  and identifying frequently failing operations.`,
+    `Retrieve usage statistics for the current server session. Shows per-tool call
+  counts, error counts, and last-used timestamps, sorted by total calls descending.
+  Use this to audit which tools have been called during the session, identify tools
+  with high error rates that may need investigation, or understand usage patterns.
+  Statistics are reset when the server restarts. The response includes total call
+  count, error count, and lastUsed timestamp for each tool that has been invoked.`,
     {},
     async () => {
       const stats = Object.entries(usageStats)
@@ -120,10 +132,13 @@ export function registerAdminTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "get_recent_tool_calls",
-    `Get the most recent tool calls with full details: tool name, arguments,
-  success/failure status, and execution duration in milliseconds. Useful for
-  debugging failed calls, recovering context after interruption, or auditing
-  recent activity.`,
+    `Retrieve the most recent tool calls with full details: tool name, serialized
+  arguments, success/failure status, and execution duration in milliseconds.
+  Returns results in reverse chronological order (newest first). Use this to
+  debug failed tool calls (see what arguments caused the error), recover context
+  after a conversation interruption, audit what tools were recently invoked, or
+  measure tool performance. The default limit is 20 calls; pass a custom limit
+  to retrieve more or fewer entries.`,
     {
       limit: z
         .number()
@@ -161,9 +176,12 @@ export function registerAdminTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "read_url",
-    `Fetch content from a URL and return it as text. Supports HTML pages, JSON APIs,
-  plain text, and more. Content is truncated at 50KB. Use for reading documentation,
-  API responses, or any web content during development.`,
+    `Fetch content from a URL and return it as plain text. Supports HTTP and HTTPS
+  URLs. Content is truncated at 50KB to keep responses manageable. Use this tool
+  to read online documentation, fetch JSON API responses, download raw file contents
+  (e.g., from GitHub raw URLs), inspect HTML pages, or access any web-accessible
+  resource during development. For localhost URLs, the server running on this PC
+  can be accessed directly. Set a longer timeout for slow-responding endpoints.`,
     {
       url: z
         .string()
@@ -211,7 +229,7 @@ export function registerAdminTools(server: McpServer) {
   server.tool(
     "read_skill_docs",
     `Read the PC Controller skill documentation files. This tool provides access to the
-complete AI skill reference — a structured guide describing all 37 available tools,
+complete AI skill reference — a structured guide describing all 38 available tools,
 their parameters, usage examples, workflows, and safety rules. Use this tool when you
 need to understand what capabilities the PC Controller MCP server offers, how to invoke
 specific tools correctly, or what workflows are available for common tasks. The skill
