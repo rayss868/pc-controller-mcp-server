@@ -1,10 +1,12 @@
 # PC Controller Tools - Detailed Reference
 
-Complete parameter reference for all 18 tools in the pc-controller MCP server.
+Complete parameter reference for all 37 tools in the pc-controller MCP server.
 
 ---
 
-## 1. run_command
+## Shell Execution
+
+### 1. run_command
 
 Execute shell commands with timeout control. Default shell is PowerShell; Git Bash and WSL are available via the `shell` parameter.
 
@@ -14,33 +16,25 @@ Execute shell commands with timeout control. Default shell is PowerShell; Git Ba
 - `timeout` (number, optional): Timeout in milliseconds. Default: 30000 (30s)
 - `shell` (string, optional): `"powershell"` (default), `"gitbash"`, or `"wsl"`
 
-**Returns:** Object with `stdout` and `stderr` strings
+**Returns:** STDOUT and STDERR strings
 
 **Examples:**
 ```
 pc-controller:run_command(command="dir C:\\Users")
 pc-controller:run_command(command="npm install", cwd="D:\\Projects\\app")
-pc-controller:run_command(command="git log --oneline -10", cwd="D:\\Projects\\app", timeout=10000)
-pc-controller:run_command(command="Get-Process | Where-Object {$_.CPU -gt 100}")
-pc-controller:run_command(command="ping -n 4 google.com")
-pc-controller:run_command(command="ipconfig /all")
 pc-controller:run_command(command="ls -la", shell="gitbash")
 pc-controller:run_command(command="grep -r 'TODO' src", cwd="D:\\Projects\\app", shell="gitbash")
 pc-controller:run_command(command="df -h && free -m", shell="wsl")
-pc-controller:run_command(command="sudo apt update", shell="wsl")
 ```
 
 **Notes:**
-- Default shell is PowerShell.exe (native Windows — always available)
-- `shell="gitbash"` uses `C:\Program Files\Git\bin\bash.exe` for Unix utilities (ls, grep, tar)
-- `shell="wsl"` uses `System32\bash.exe` (WSL default distro, e.g. Ubuntu) for real Linux commands
-- Returns both STDOUT and STDERR
-- Increase timeout for slow commands
+- `shell="gitbash"` uses `C:\Program Files\Git\bin\bash.exe` for Unix utilities
+- `shell="wsl"` uses `System32\bash.exe` (WSL default distro) for real Linux commands
 - Dangerous commands will execute — verify before running
 
 ---
 
-## 2. run_command_long
+### 2. run_command_long
 
 Execute long-running shell commands with extended timeout.
 
@@ -49,50 +43,74 @@ Execute long-running shell commands with extended timeout.
 - `cwd` (string, optional): Working directory (absolute path). Default: user home directory
 - `timeout` (number, optional): Timeout in milliseconds. Default: 120000 (2 min)
 
-**Returns:** Object with `stdout` and `stderr` strings
+**Returns:** Exit code, STDOUT, and STDERR
 
 **Examples:**
 ```
 pc-controller:run_command_long(command="npm install", cwd="D:\\Projects\\app")
-pc-controller:run_command_long(command="pip install tensorflow")
 pc-controller:run_command_long(command="git clone https://github.com/user/repo.git", cwd="D:\\Projects")
 pc-controller:run_command_long(command="cargo build --release", cwd="D:\\Rust\\project")
-pc-controller:run_command_long(command="mvn clean install", cwd="D:\\Java\\app", timeout=300000)
 ```
 
 **Notes:**
 - Use for commands that take >30 seconds
 - Larger output buffer than run_command
-- Returns exit code, STDOUT, and STDERR
 
 ---
 
-## 3. file_read
+### 3. execute_code
 
-Read text file contents with encoding support.
+Execute code in-memory using Python, Node.js, or R without saving files.
+
+**Parameters:**
+- `language` (string, required): `"python"`, `"node"`, or `"r"`
+- `code` (string, required): Source code to execute
+
+**Returns:** stdout/stderr output
+
+**Examples:**
+```
+pc-controller:execute_code(language="python", code="print(sum(range(1, 101)))")
+pc-controller:execute_code(language="node", code="console.log(2 + 2)")
+pc-controller:execute_code(language="python", code="import os; print(os.listdir('.'))")
+```
+
+**Notes:**
+- Python and R must be installed on the system
+- Node.js is always available (server runs on it)
+- 60 second timeout
+
+---
+
+## File Operations
+
+### 4. file_read
+
+Read text file contents with encoding support and line-range selection.
 
 **Parameters:**
 - `path` (string, required): Absolute file path
-- `encoding` (string, optional): File encoding. Default: "utf-8". Options: "utf-8", "ascii", "latin1", "utf16le"
+- `encoding` (string, optional): File encoding. Default: "utf-8"
+- `offset` (number, optional): Starting line (1-based). Negative values count from the end (e.g., -100 = last 100 lines)
+- `limit` (number, optional): Maximum number of lines to read. Default: 2000
 
-**Returns:** Object with `content` string
+**Returns:** File content string
 
 **Examples:**
 ```
 pc-controller:file_read(path="C:\\Users\\rayss\\Documents\\config.json")
-pc-controller:file_read(path="D:\\Projects\\app\\src\\index.ts")
-pc-controller:file_read(path="C:\\Windows\\System32\\drivers\\etc\\hosts")
-pc-controller:file_read(path="D:\\logs\\app.log", encoding="latin1")
+pc-controller:file_read(path="D:\\logs\\app.log", offset=-100)  # last 100 lines
+pc-controller:file_read(path="D:\\src\\index.ts", offset=50, limit=100)  # lines 50-150
 ```
 
 **Notes:**
 - For text files only (not binary)
 - Use absolute paths
-- Returns full file content as string
+- Negative offset reads from the end (tail behavior)
 
 ---
 
-## 4. file_write
+### 5. file_write
 
 Write text content to files with auto-directory creation.
 
@@ -100,50 +118,100 @@ Write text content to files with auto-directory creation.
 - `path` (string, required): Absolute file path
 - `content` (string, required): Text content to write
 
-**Returns:** Object with `success` boolean and `path` string
+**Returns:** Success confirmation with path
 
 **Examples:**
 ```
 pc-controller:file_write(path="D:\\output.txt", content="Hello World")
 pc-controller:file_write(path="C:\\Users\\rayss\\config.json", content="{\"key\": \"value\"}")
-pc-controller:file_write(path="D:\\Projects\\app\\data.csv", content="name,age\nJohn,30\nJane,25")
 ```
 
 **Notes:**
 - Creates parent directories if they don't exist
 - Overwrites existing files completely
-- Use absolute paths
-- UTF-8 encoding
+- Use `file_edit` for small changes instead
 
 ---
 
-## 5. dir_list
+### 6. file_edit
 
-List directory contents with optional recursion.
+Surgical search & replace — edit specific text without overwriting the entire file.
 
 **Parameters:**
-- `path` (string, optional): Directory path (absolute). Default: user home directory
-- `recursive` (boolean, optional): List subdirectories recursively. Default: false
-- `max_depth` (number, optional): Maximum recursion depth. Default: 3
+- `path` (string, required): Absolute file path
+- `old_string` (string, required): Exact text to find
+- `new_string` (string, required): Replacement text
+- `replace_all` (boolean, optional): Replace all occurrences. Default: false
 
-**Returns:** Object with `entries` array containing name, type, size, modified date
+**Returns:** Confirmation with number of replacements
 
 **Examples:**
 ```
-pc-controller:dir_list()
-pc-controller:dir_list(path="C:\\Users\\rayss\\Desktop")
-pc-controller:dir_list(path="D:\\Projects", recursive=true)
-pc-controller:dir_list(path="C:\\Program Files", recursive=true, max_depth=2)
+pc-controller:file_edit(path="D:\\config.json", old_string="port: 3000", new_string="port: 8080")
+pc-controller:file_edit(path="D:\\src\\app.ts", old_string="const DEBUG = false", new_string="const DEBUG = true")
 ```
 
 **Notes:**
-- Shows file/folder name, type, size, modified date
-- Recursive mode limited to max_depth levels
-- Skips permission errors in recursive mode
+- `old_string` must match exactly (including whitespace)
+- Fails if `old_string` is not found or matches multiple times (unless replace_all)
+- Safer than file_write for small changes
 
 ---
 
-## 6. file_search
+### 7. file_move
+
+Move or rename files and directories (auto-creates destination folders).
+
+**Parameters:**
+- `source` (string, required): Current path of file/directory
+- `destination` (string, required): New path
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:file_move(source="D:\\old.txt", destination="D:\\archive\\old.txt")
+pc-controller:file_move(source="D:\\project", destination="E:\\backup\\project")
+```
+
+---
+
+### 8. file_info
+
+Get file metadata — size, created/modified dates, read-only status.
+
+**Parameters:**
+- `path` (string, required): Absolute file path
+
+**Returns:** Size, creation date, modification date, read-only flag, type
+
+**Examples:**
+```
+pc-controller:file_info(path="D:\\Projects\\app\\package.json")
+```
+
+---
+
+### 9. file_tail
+
+Read last N lines or bytes of a file (Unix tail equivalent).
+
+**Parameters:**
+- `path` (string, required): Absolute file path
+- `lines` (number, optional): Number of lines from the end. Default: 10
+- `bytes` (number, optional): Number of bytes from the end (overrides lines)
+
+**Returns:** Last N lines/bytes of the file
+
+**Examples:**
+```
+pc-controller:file_tail(path="D:\\logs\\app.log", lines=50)
+pc-controller:file_tail(path="D:\\logs\\app.log", bytes=1024)
+```
+
+---
+
+### 10. file_search
 
 Search files by glob pattern recursively.
 
@@ -152,72 +220,186 @@ Search files by glob pattern recursively.
 - `directory` (string, optional): Starting directory (absolute). Default: user home directory
 - `max_results` (number, optional): Maximum results to return. Default: 50
 
-**Returns:** Object with `files` array of absolute paths
+**Returns:** Array of absolute file paths
 
 **Examples:**
 ```
 pc-controller:file_search(pattern="*.txt")
 pc-controller:file_search(pattern="*.json", directory="D:\\Projects")
-pc-controller:file_search(pattern="config*", directory="C:\\Users\\rayss")
 pc-controller:file_search(pattern="*.log", directory="D:\\logs", max_results=100)
-pc-controller:file_search(pattern="report_*.xlsx", directory="C:\\Users\\rayss\\Documents")
 ```
-
-**Notes:**
-- Uses PowerShell Get-ChildItem (fast)
-- Recursive search through all subdirectories
-- Returns absolute file paths
 
 ---
 
-## 7. screen_capture
+### 11. content_search
+
+Search text inside files recursively (grep-like, with line numbers).
+
+**Parameters:**
+- `pattern` (string, required): Text or regex pattern to search for
+- `directory` (string, optional): Directory to search in. Default: user home directory
+- `file_pattern` (string, optional): Glob to filter files (e.g., "*.ts"). Default: all files
+- `max_results` (number, optional): Maximum matches. Default: 50
+
+**Returns:** Matching lines with file paths and line numbers
+
+**Examples:**
+```
+pc-controller:content_search(pattern="TODO", directory="D:\\Projects\\src")
+pc-controller:content_search(pattern="function login", directory="D:\\app", file_pattern="*.ts")
+```
+
+---
+
+### 12. read_multiple_files
+
+Read contents of multiple files simultaneously.
+
+**Parameters:**
+- `paths` (array of strings, required): List of absolute file paths
+
+**Returns:** Content of each file, labeled by path
+
+**Examples:**
+```
+pc-controller:read_multiple_files(paths=["D:\\a.txt", "D:\\b.txt", "D:\\c.json"])
+```
+
+---
+
+### 13. dir_list
+
+List directory contents with optional recursion.
+
+**Parameters:**
+- `path` (string, optional): Directory path (absolute). Default: user home directory
+- `recursive` (boolean, optional): List subdirectories recursively. Default: false
+- `depth` (number, optional): Maximum recursion depth. Default: 3
+
+**Returns:** Entries with name, type, size, modified date
+
+**Examples:**
+```
+pc-controller:dir_list()
+pc-controller:dir_list(path="C:\\Users\\rayss\\Desktop")
+pc-controller:dir_list(path="D:\\Projects", recursive=true, depth=2)
+```
+
+---
+
+### 14. create_directory
+
+Create directories recursively (mkdir -p equivalent).
+
+**Parameters:**
+- `path` (string, required): Directory path to create
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:create_directory(path="D:\\Projects\\new-app\\src\\components")
+```
+
+---
+
+### 15. copy_file
+
+Copy files or directories to a new location.
+
+**Parameters:**
+- `source` (string, required): File/directory to copy
+- `destination` (string, required): Target path
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:copy_file(source="D:\\config.json", destination="D:\\backup\\config.json")
+pc-controller:copy_file(source="D:\\project", destination="E:\\backup\\project")
+```
+
+---
+
+### 16. delete_file
+
+Delete files or directories permanently.
+
+**Parameters:**
+- `path` (string, required): File/directory to delete
+- `recursive` (boolean, optional): Delete directory contents recursively. Default: false
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:delete_file(path="D:\\temp\\old-file.txt")
+pc-controller:delete_file(path="D:\\temp\\old-folder", recursive=true)
+```
+
+**Notes:**
+- WARNING: Permanent deletion, no recycle bin
+- Use `recursive=true` for directories
+
+---
+
+### 17. preview_file
+
+Preview file contents with rich formatting. Images returned as base64 for inline display.
+
+**Parameters:**
+- `path` (string, required): Absolute path to the file to preview
+
+**Returns:** Base64 image (for images), markdown stats (for .md), code with metadata (for code files)
+
+**Examples:**
+```
+pc-controller:preview_file(path="C:\\Users\\me\\photo.png")  # inline base64 image
+pc-controller:preview_file(path="D:\\project\\README.md")  # markdown with stats
+pc-controller:preview_file(path="D:\\project\\src\\index.ts")  # code with metadata
+```
+
+**Notes:**
+- Supported images: PNG, JPG, JPEG, GIF, BMP, ICO, SVG, WEBP
+- AI can view returned images directly
+
+---
+
+## Screen & System
+
+### 18. screen_capture
 
 Capture screenshot of primary monitor.
 
 **Parameters:**
 - `output_path` (string, optional): Save screenshot to this path (absolute)
 
-**Returns:** Object with `image` (base64 PNG) and `path` (if saved)
+**Returns:** Base64 PNG image (and path if saved)
 
 **Examples:**
 ```
 pc-controller:screen_capture()
 pc-controller:screen_capture(output_path="C:\\Screenshots\\screen.png")
-pc-controller:screen_capture(output_path="D:\\debug\\ui_state.png")
 ```
-
-**Notes:**
-- Returns base64-encoded PNG image
-- AI can view the image directly
-- Optionally saves to disk
-- Full monitor resolution
 
 ---
 
-## 8. sys_info
+### 19. sys_info
 
 Get comprehensive system information.
 
 **Parameters:** None
 
-**Returns:** Object with hostname, OS, CPU, RAM, disk, network information
+**Returns:** Hostname, OS, CPU, RAM, disk space, network IPs
 
 **Examples:**
 ```
 pc-controller:sys_info()
 ```
 
-**Notes:**
-- No parameters needed
-- Returns formatted system overview
-- Includes CPU model, core count, clock speed
-- Shows total/free/used RAM
-- Lists disk space per drive
-- Shows network interfaces with IPs
-
 ---
 
-## 9. process_list
+### 20. process_list
 
 List running processes with filtering and sorting.
 
@@ -225,27 +407,18 @@ List running processes with filtering and sorting.
 - `filter` (string, optional): Filter by process name (partial match, case-insensitive)
 - `sort_by` (string, optional): Sort by "name", "memory", or "cpu". Default: "memory"
 
-**Returns:** Object with `processes` array containing name, PID, memory (MB), CPU time (s)
+**Returns:** Top 30 processes with name, PID, memory (MB), CPU time
 
 **Examples:**
 ```
 pc-controller:process_list()
 pc-controller:process_list(filter="chrome")
-pc-controller:process_list(filter="node", sort_by="memory")
 pc-controller:process_list(sort_by="cpu")
-pc-controller:process_list(filter="code", sort_by="name")
 ```
-
-**Notes:**
-- Shows top 30 processes
-- Filter is partial match (e.g., "chr" matches "chrome")
-- Sort by memory to find RAM hogs
-- Sort by CPU to find CPU-intensive processes
-- Use before process_kill to identify target
 
 ---
 
-## 10. process_kill
+### 21. process_kill
 
 Force-terminate running processes.
 
@@ -253,102 +426,81 @@ Force-terminate running processes.
 - `name` (string, optional): Process name without .exe (kills ALL instances)
 - `pid` (number, optional): Specific Process ID (kills one process)
 
-**Returns:** Object with `success` boolean and `message` string
+**Returns:** Success confirmation
 
 **Examples:**
 ```
 pc-controller:process_kill(name="notepad")
 pc-controller:process_kill(pid=1234)
-pc-controller:process_kill(name="chrome")
 ```
 
 **Notes:**
 - WARNING: Cannot be undone, unsaved data lost
-- Use `name` to kill all instances of a process
-- Use `pid` to kill specific process (safer)
 - Always use process_list first to identify target
-- Force-kills without confirmation
 
 ---
 
-## 11. open_path
+## Utilities
+
+### 22. open_path
 
 Open files, folders, or URLs with default applications.
 
 **Parameters:**
 - `target` (string, required): File path, folder path, or URL
 
-**Returns:** Object with `success` boolean and `message` string
+**Returns:** Success confirmation
 
 **Examples:**
 ```
 pc-controller:open_path(target="C:\\Documents\\report.pdf")
-pc-controller:open_path(target="C:\\Users\\rayss\\Desktop")
 pc-controller:open_path(target="https://google.com")
-pc-controller:open_path(target="D:\\Projects\\app\\index.html")
-pc-controller:open_path(target="C:\\Program Files\\MyApp\\app.exe")
+pc-controller:open_path(target="C:\\Users\\rayss\\Desktop")
 ```
-
-**Notes:**
-- Files: Opens with registered application
-- Folders: Opens in Windows Explorer
-- URLs: Opens in default browser
-- Uses Windows Start-Process
 
 ---
 
-## 12. clipboard_get
+### 23. clipboard_get
 
 Read the current text content of the system clipboard.
 
 **Parameters:** None
 
-**Returns:** Object with `content` string (or "(clipboard is empty)" when nothing is copied)
+**Returns:** Clipboard text content
 
 **Examples:**
 ```
 pc-controller:clipboard_get()
 ```
 
-**Notes:**
-- Returns the last copied item
-- Useful to grab data copied from other applications
-- Works on any text content (files, URLs, selected text)
-
 ---
 
-## 13. clipboard_set
+### 24. clipboard_set
 
 Copy text to the system clipboard.
 
 **Parameters:**
 - `text` (string, required): Text to copy to the clipboard
 
-**Returns:** Object with confirmation message and character count
+**Returns:** Confirmation with character count
 
 **Examples:**
 ```
 pc-controller:clipboard_set(text="Hello World")
-pc-controller:clipboard_set(text="Project version: 1.2.3")
 pc-controller:clipboard_set(text="npm install --save lodash")
 ```
 
-**Notes:**
-- Copies text to clipboard
-- User can then paste (Ctrl+V) in any app
-- Useful for transferring data between apps
-
 ---
 
-## 14. zip_create
+### 25. zip_create
 
-Create a ZIP archive from files or folders using PowerShell Compress-Archive.
+Create a ZIP archive from files or folders.
 
 **Parameters:**
-- `source` (string, required): File/folder to compress. Can use wildcards (e.g. `D:\logs\*.log`)
-- `destination` (string, required): Output .zip file path (should end in .zip)
+- `source` (string, required): File/folder to compress (supports wildcards)
+- `destination` (string, required): Output .zip file path
 
-**Returns:** Confirmation message with the created archive path
+**Returns:** Confirmation with archive path
 
 **Examples:**
 ```
@@ -356,92 +508,71 @@ pc-controller:zip_create(source="D:\\Projects\\myapp", destination="D:\\backup\\
 pc-controller:zip_create(source="D:\\logs\\*.log", destination="D:\\backup\\logs.zip")
 ```
 
-**Notes:**
-- Creates the .zip with `-Force` (overwrites existing destination)
-- Returns an error if the source does not exist
-- Supports wildcards in source
-
 ---
 
-## 15. zip_extract
+### 26. zip_extract
 
-Extract a ZIP archive to a destination folder using PowerShell Expand-Archive.
+Extract a ZIP archive to a destination folder.
 
 **Parameters:**
-- `archive` (string, required): Path to the .zip file to extract
-- `destination` (string, required): Output folder (created automatically if missing)
+- `archive` (string, required): Path to the .zip file
+- `destination` (string, required): Output folder (created automatically)
 
-**Returns:** Confirmation message with the extraction path
+**Returns:** Confirmation with extraction path
 
 **Examples:**
 ```
 pc-controller:zip_extract(archive="D:\\downloads\\backup.zip", destination="D:\\Projects\\myapp")
 ```
 
-**Notes:**
-- Destination folder is created automatically
-- Overwrites existing files in the destination
-
 ---
 
-## 16. window_focus
+### 27. window_focus
 
-Bring a window to the foreground by matching its title or process name (case-insensitive).
+Bring a window to the foreground by matching its title or process name.
 
 **Parameters:**
 - `title` (string, required): Window title or process name to focus
 
-**Returns:** Success message, or error if no matching window is found
+**Returns:** Success message or error if not found
 
 **Examples:**
 ```
 pc-controller:window_focus(title="Notepad")
 pc-controller:window_focus(title="Visual Studio Code")
-pc-controller:window_focus(title="chrome")
 ```
-
-**Notes:**
-- Matches any open window whose title contains the given text (case-insensitive)
-- Call before `key_type` to make sure the target window is active
-- Returns an error when no matching window is found
 
 ---
 
-## 17. key_type
+### 28. key_type
 
-Type text or send keystrokes to the currently focused window using PowerShell SendKeys.
+Type text or send keystrokes to the currently focused window.
 
 **Parameters:**
-- `text` (string, optional): Literal text to type — special characters are escaped automatically
-- `keys` (string, optional): Raw SendKeys string for shortcuts/special keys (takes precedence over `text`)
-- `delay_ms` (number, optional): Delay between characters in milliseconds (text mode only). Default: 0
+- `text` (string, optional): Literal text to type (special characters auto-escaped)
+- `keys` (string, optional): Raw SendKeys string for shortcuts (takes precedence over text)
+- `delay_ms` (number, optional): Delay between characters in ms. Default: 0
 
-**Returns:** Confirmation of typed characters / sent keys
+**Returns:** Confirmation of typed characters/sent keys
 
 **Examples:**
 ```
 pc-controller:key_type(text="Hello world")
-pc-controller:key_type(text="npm install", delay_ms=50)
 pc-controller:key_type(keys="^s")            # Ctrl+S (save)
 pc-controller:key_type(keys="{ENTER}")        # Enter key
-pc-controller:key_type(keys="%{F4}")          # Alt+F4 (close window)
+pc-controller:key_type(keys="%{F4}")          # Alt+F4
 ```
 
-**SendKeys reference for `keys`:**
+**SendKeys reference:**
 - `^c` = Ctrl+C, `^v` = Ctrl+V, `^a` = Ctrl+A, `^s` = Ctrl+S
-- `{ENTER}`, `{TAB}`, `{ESC}`, `{BACKSPACE}`, `{DEL}`, `{UP}`, `{DOWN}`, `{LEFT}`, `{RIGHT}`
-- `{F1}`–`{F12}`, `%{F4}` = Alt+F4, `+{TAB}` = Shift+Tab
-
-**Notes:**
-- Call `window_focus` first to activate the target window
-- `text` is escaped so literal characters like `+ ^ % ~ ( ) { }` are typed as-is
-- `keys` sends raw SendKeys syntax and is NOT escaped — use it for shortcuts
+- `{ENTER}`, `{TAB}`, `{ESC}`, `{BACKSPACE}`, `{DEL}`, `{UP}`, `{DOWN}`
+- `{F1}`–`{F12}`, `%{F4}` = Alt+F4
 
 ---
 
-## 18. notify
+### 29. notify
 
-Show a Windows notification balloon with the given title and message.
+Show a Windows notification balloon.
 
 **Parameters:**
 - `title` (string, required): Notification title
@@ -452,28 +583,157 @@ Show a Windows notification balloon with the given title and message.
 **Examples:**
 ```
 pc-controller:notify(title="Build Finished", message="npm run build completed successfully")
-pc-controller:notify(title="Download Ready", message="Your file is ready to install")
 ```
 
-**Notes:**
-- Notification stays visible for ~6 seconds
-- Uses a Windows Forms NotifyIcon balloon (no extra dependencies)
-- Good for alerting the user when a long task completes
+---
+
+## Terminal Sessions
+
+### 30. list_sessions
+
+List all active terminal sessions managed by this server.
+
+**Parameters:** None
+
+**Returns:** Session IDs, creation times, output line counts, alive status
+
+**Examples:**
+```
+pc-controller:list_sessions()
+```
+
+---
+
+### 31. read_process_output
+
+Read buffered output from a long-running session with pagination.
+
+**Parameters:**
+- `session_id` (string, required): Session ID from list_sessions
+- `offset` (number, optional): Starting line index. Default: 0
+- `length` (number, optional): Number of lines to read. Default: 100
+
+**Returns:** Output lines from the session
+
+**Examples:**
+```
+pc-controller:read_process_output(session_id="session-1")
+pc-controller:read_process_output(session_id="session-1", offset=50, length=20)
+```
+
+---
+
+### 32. interact_with_process
+
+Send input to a running interactive process (SSH, database CLIs, dev servers).
+
+**Parameters:**
+- `session_id` (string, required): Session ID from list_sessions
+- `input` (string, required): Input to send to the process
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:interact_with_process(session_id="session-1", input="ls -la")
+pc-controller:interact_with_process(session_id="session-1", input="SELECT * FROM users;")
+pc-controller:interact_with_process(session_id="session-1", input="y")
+```
+
+---
+
+## Configuration & Monitoring
+
+### 33. config_get
+
+Get the complete server configuration.
+
+**Parameters:** None
+
+**Returns:** JSON with blockedCommands, defaultShell, fileReadLineLimit, fileWriteLineLimit
+
+**Examples:**
+```
+pc-controller:config_get()
+```
+
+---
+
+### 34. config_set
+
+Set a configuration value at runtime. Changes take effect immediately.
+
+**Parameters:**
+- `key` (string, required): Config key: "defaultShell", "blockedCommands", "fileReadLineLimit", "fileWriteLineLimit"
+- `value` (string, required): New value (JSON array string for arrays)
+
+**Returns:** Confirmation with updated value
+
+**Examples:**
+```
+pc-controller:config_set(key="defaultShell", value="bash")
+pc-controller:config_set(key="blockedCommands", value='["rm -rf", "format"]')
+pc-controller:config_set(key="fileReadLineLimit", value="5000")
+```
+
+---
+
+### 35. get_usage_stats
+
+Get usage statistics for the current server session.
+
+**Parameters:** None
+
+**Returns:** Per-tool call counts, error rates, last-used timestamps
+
+**Examples:**
+```
+pc-controller:get_usage_stats()
+```
+
+---
+
+### 36. get_recent_tool_calls
+
+Get the most recent tool calls with full details.
+
+**Parameters:**
+- `limit` (number, optional): Number of recent calls to return. Default: 20
+
+**Returns:** Tool name, arguments, success/failure, duration in ms
+
+**Examples:**
+```
+pc-controller:get_recent_tool_calls()
+pc-controller:get_recent_tool_calls(limit=5)
+```
+
+---
+
+## Network
+
+### 37. read_url
+
+Fetch content from a URL and return it as text.
+
+**Parameters:**
+- `url` (string, required): URL to fetch (must start with http:// or https://)
+- `timeout` (number, optional): Request timeout in seconds. Default: 30
+
+**Returns:** Page/API content as text (truncated at 50KB)
+
+**Examples:**
+```
+pc-controller:read_url(url="https://api.github.com/repos/user/repo")
+pc-controller:read_url(url="https://raw.githubusercontent.com/user/repo/main/README.md")
+pc-controller:read_url(url="http://localhost:3000/api/data")
+```
 
 ---
 
 ## Error Handling
 
 All tools return error information when something goes wrong:
-
-**Error response format:**
-```json
-{
-  "error": true,
-  "message": "Error description",
-  "details": "Additional error details"
-}
-```
 
 **Common errors:**
 - File not found: Check absolute path
@@ -489,37 +749,10 @@ All tools return error information when something goes wrong:
 1. **Always use absolute paths** — never relative paths
 2. **Verify before destructive actions** — check paths, process names
 3. **Use process_list before process_kill** — confirm the right target
-4. **Increase timeout for slow commands** — don't let them fail
-5. **Backup before file_write** on important files — it overwrites
-6. **Use PID for process_kill** when possible — more precise than name
-7. **Check return values** — all tools return success/error info
-8. **Filter process_list** — don't list all processes when looking for specific app
-9. **Limit file_search results** — use max_results to avoid overwhelming output
-10. **Test commands with run_command** before using run_command_long
-
----
-
-## PowerShell Tips
-
-Since all shell commands run via PowerShell:
-
-**Useful commands:**
-- `Get-Command` — list available commands
-- `Get-Help <command>` — get command help
-- `|` — pipe commands together
-- `Where-Object` — filter objects
-- `Select-Object` — select properties
-- `Format-Table` — format output as table
-- `Get-Content` — read file contents
-- `Set-Content` — write to file
-- `Copy-Item` — copy files
-- `Move-Item` — move files
-- `Remove-Item` — delete files
-
-**Examples:**
-```powershell
-Get-Process | Where-Object {$_.Memory -gt 100MB} | Select-Object Name, Id, Memory
-Get-ChildItem -Recurse -Filter "*.log" | Select-Object FullName, Length
-Get-Volume | Select-Object DriveLetter, SizeRemaining, Size
-Test-NetConnection google.com -Port 443
-```
+4. **Use file_edit instead of file_write** for small changes — safer
+5. **Increase timeout for slow commands** — don't let them fail
+6. **Backup before file_write** on important files — it overwrites
+7. **Use PID for process_kill** when possible — more precise than name
+8. **Limit file_search results** — use max_results to avoid overwhelming output
+9. **Test commands with run_command** before using run_command_long
+10. **Use read_process_output with pagination** — avoid flooding context

@@ -198,12 +198,32 @@ async function runTests() {
         "window_focus",
         "key_type",
         "notify",
+        "file_edit",
+        "file_move",
+        "file_info",
+        "file_tail",
+        "content_search",
+        "read_multiple_files",
+        "create_directory",
+        "copy_file",
+        "delete_file",
+        "execute_code",
+        "list_sessions",
+        "read_process_output",
+        "interact_with_process",
+        "config_get",
+        "config_set",
+        "get_usage_stats",
+        "get_recent_tool_calls",
+        "read_url",
+        "preview_file",
+        "notify",
       ];
 
       const missing = expectedTools.filter((t) => !toolNames.includes(t));
       logResult(
         "tools/list",
-        missing.length === 0 && toolNames.length === 18,
+        missing.length === 0 && toolNames.length === 37,
         `${toolNames.length} tools found${missing.length ? `, missing: ${missing.join(", ")}` : ""}`
       );
     } catch (e) {

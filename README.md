@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://modelcontextprotocol.io/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-17%2F17%20passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/tests-25%2F25%20passing-brightgreen.svg)](test/)
 
 ---
 
@@ -41,7 +41,7 @@ Works with any MCP-compatible AI client:
 
 ## ✨ Features
 
-### 🛠️ 18 Powerful Tools
+### 🛠️ 37 Powerful Tools
 
 | Tool | Description |
 |------|-------------|
@@ -63,6 +63,25 @@ Works with any MCP-compatible AI client:
 | **window_focus** | Bring a window to the foreground (by title/process name) |
 | **key_type** | Type text or send keystrokes to the focused window |
 | **notify** | Show a Windows notification balloon with a title and message |
+| **file_edit** | Surgical search & replace — edit specific text without overwriting the entire file |
+| **file_move** | Move or rename files and directories (auto-creates destination folders) |
+| **file_info** | Get file metadata — size, created/modified dates, read-only status |
+| **file_tail** | Read last N lines or bytes of a file (Unix tail equivalent) |
+| **content_search** | Search text inside files recursively (grep-like, with line numbers) |
+| **read_multiple_files** | Read contents of multiple files simultaneously |
+| **create_directory** | Create directories recursively (mkdir -p equivalent) |
+| **copy_file** | Copy files or directories to a new location |
+| **delete_file** | Delete files or directories permanently |
+| **execute_code** | Run Python/Node.js/R code in memory without saving files |
+| **list_sessions** | List active terminal sessions |
+| **read_process_output** | Read output from sessions with offset/length pagination |
+| **interact_with_process** | Send input to running interactive processes |
+| **config_get** | Get server configuration |
+| **config_set** | Update configuration values |
+| **get_usage_stats** | Get tool usage statistics |
+| **get_recent_tool_calls** | Get recent tool call history |
+| **read_url** | Fetch content from URLs (HTML, JSON, raw text) |
+| **preview_file** | Preview files with inline images (base64), markdown, and code syntax |
 
 ### 🎨 Key Capabilities
 
@@ -70,7 +89,7 @@ Works with any MCP-compatible AI client:
 - **Comprehensive Control**: From file operations to process management
 - **Visual Feedback**: Screenshot capture with base64 encoding for AI viewing
 - **Safe by Design**: Detailed tool descriptions help AI make informed decisions
-- **Production Ready**: Fully tested (25/25 tests passing) and documented
+- **Production Ready**: Fully tested (40/40 tests passing) and documented
 - **Developer Friendly**: TypeScript source code with full type safety
 
 ---
@@ -243,17 +262,34 @@ Once configured, you can ask your AI assistant to perform tasks like:
 │              PC Controller MCP Server (Node.js)              │
 │                                                              │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ tools/       │  │ tools/       │  │ tools/       │      │
+│  │  shell.ts    │  │  files.ts    │  │  system.ts   │      │
 │  │ run_command  │  │ file_read    │  │ screen_      │      │
 │  │ run_command_ │  │ file_write   │  │ capture      │      │
-│  │ long         │  │ dir_list     │  │ sys_info     │      │
-│  │ (shell:      │  │ file_search  │  │ process_list │      │
-│  │  ps/bash/wsl)│  │ zip_create   │  │ process_kill │      │
-│  │              │  │ zip_extract  │  │ open_path    │      │
-│  │              │  │              │  │ clipboard_   │      │
-│  │              │  │              │  │ get+set      │      │
-│  │              │  │              │  │ window_focus │      │
-│  │              │  │              │  │ key_type     │      │
-│  │              │  │              │  │ notify       │      │
+│  │ long         │  │ file_edit    │  │ sys_info     │      │
+│  │ execute_code │  │ file_move    │  │ process_list │      │
+│  │              │  │ file_info    │  │ process_kill │      │
+│  │              │  │ file_tail    │  │ open_path    │      │
+│  │              │  │ file_search  │  │ clipboard_*  │      │
+│  │              │  │ content_     │  │ window_focus │      │
+│  │              │  │ search       │  │ key_type     │      │
+│  │              │  │ read_multi   │  │ notify       │      │
+│  │              │  │ dir_list     │  │ zip_*        │      │
+│  │              │  │ create_dir   │  │              │      │
+│  │              │  │ copy_file    │  │              │      │
+│  │              │  │ delete_file  │  │              │      │
+│  │              │  │ preview_file │  │              │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ tools/       │  │ tools/       │  │ state.ts     │      │
+│  │  sessions.ts │  │  admin.ts    │  │ helpers.ts   │      │
+│  │ list_sessions│  │ config_get   │  │ (shared)     │      │
+│  │ read_process_│  │ config_set   │  │              │      │
+│  │ output       │  │ get_usage_   │  │              │      │
+│  │ interact_    │  │ stats        │  │              │      │
+│  │ with_process │  │ get_recent_  │  │              │      │
+│  │              │  │ tool_calls   │  │              │      │
+│  │              │  │ read_url     │  │              │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -282,11 +318,11 @@ node test/test.js
 ### Test Coverage
 
 - ✅ Protocol handshake (initialize, tools/list)
-- ✅ All 18 tools functionality
+- ✅ All 37 tools functionality
 - ✅ Error handling (invalid commands, non-existent files, unknown tools)
 - ✅ Edge cases and boundary conditions
 
-**Test Results**: 25/25 passing ✅
+**Test Results**: 40/40 passing ✅
 
 ---
 
@@ -318,9 +354,16 @@ See the source code in `src/index.ts` for complete tool definitions.
 ```
 pc_controller/
 ├── src/
-│   └── index.ts              # Main MCP server implementation
+│   ├── index.ts              # Entry point — server bootstrap & tool registration
+│   ├── state.ts              # Shared state (sessions, usage stats, config)
+│   ├── helpers.ts            # Shared utilities (execAsync, formatBytes, shell builder)
+│   └── tools/
+│       ├── shell.ts          # run_command, run_command_long, execute_code
+│       ├── files.ts          # 14 file tools (read, write, edit, search, preview, ...)
+│       ├── system.ts         # 12 system tools (screenshot, sys_info, processes, UI, ...)
+│       ├── sessions.ts       # list_sessions, read_process_output, interact_with_process
+│       └── admin.ts          # config_get/set, usage stats, recent calls, read_url
 ├── dist/                      # Compiled JavaScript
-│   └── index.js
 ├── test/
 │   └── test.js               # Test suite (25 tests)
 ├── skill/
@@ -483,19 +526,21 @@ MIT License - see LICENSE file for details
 
 ## 🗺️ Roadmap
 
-### Version 1.1 (Planned)
-- [ ] Mouse and keyboard control tools
+### Version 2.1 (Current)
+- [x] 37 tools across 5 modular categories
+- [x] DesktopCommanderMCP feature parity (except Docker sandbox)
+- [x] File Preview UI with inline base64 images
+- [x] Terminal session management
+- [x] Usage statistics and audit logging
+- [x] Runtime configuration management
+
+### Version 2.2 (Planned)
+- [ ] Mouse control (click, drag, scroll)
 - [ ] Window management (minimize, maximize, resize)
-- [ ] System notifications
 - [ ] Volume control
+- [ ] HTTP/SSE transport for web clients
 
-### Version 1.2 (Planned)
-- [ ] Security sandbox mode
-- [ ] Command whitelisting
-- [ ] Audit logging
-- [ ] HTTP/SSE transport
-
-### Version 2.0 (Future)
+### Version 3.0 (Future)
 - [ ] Cross-platform support (Linux, macOS)
 - [ ] Plugin system for custom tools
 - [ ] Remote PC control via SSH

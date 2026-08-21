@@ -1,6 +1,6 @@
 {
   "name": "pc-controller-mcp",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Universal MCP server untuk kontrol PC Windows — shell execution, file operations, screenshot, system info, process management, clipboard, dan lainnya.",
   "type": "module",
   "main": "dist/index.js",
