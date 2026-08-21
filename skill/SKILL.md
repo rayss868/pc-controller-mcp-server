@@ -5,7 +5,7 @@ description: Control a Windows PC via MCP tools — execute shell commands, read
 
 # PC Controller
 
-Control this Windows PC using the `pc-controller` MCP server (37 tools). All tools run via PowerShell on Windows 10/11.
+Control this Windows PC using the `pc-controller` MCP server (38 tools). All tools run via PowerShell on Windows 10/11.
 
 ## Tool Reference
 
@@ -116,6 +116,7 @@ pc-controller:process_kill(pid=1234)
 | `pc-controller:config_set` | Update configuration values at runtime |
 | `pc-controller:get_usage_stats` | Get tool usage statistics for current session |
 | `pc-controller:get_recent_tool_calls` | Get recent tool call history with duration/status |
+| `pc-controller:read_skill_docs` | Read skill documentation (tool reference, workflows, examples) |
 
 ### Network
 

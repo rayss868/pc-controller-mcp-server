@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import * as fs from "fs/promises";
+import * as path from "path";
 import { execAsync } from "../helpers.js";
 import { config, usageStats, recentToolCalls } from "../state.js";
 
@@ -202,5 +204,84 @@ export function registerAdminTools(server: McpServer) {
     }
   );
   
+  // ═══════════════════════════════════════════════════════════════════════
+
+  //  TOOL 38: Read Skill Documentation
+  // ═══════════════════════════════════════════════════════════════════════
+  server.tool(
+    "read_skill_docs",
+    `Read the PC Controller skill documentation files. This tool provides access to the
+complete AI skill reference — a structured guide describing all 37 available tools,
+their parameters, usage examples, workflows, and safety rules. Use this tool when you
+need to understand what capabilities the PC Controller MCP server offers, how to invoke
+specific tools correctly, or what workflows are available for common tasks. The skill
+documentation is the authoritative source for tool usage and is updated alongside code
+changes. Returns the full content of the requested skill file as markdown text.`,
+    {
+      file: z
+        .enum(["SKILL.md", "reference/tools.md", "all"])
+        .describe(
+          'Which skill documentation file to read:\n- "SKILL.md" — Main skill overview with tool summaries, workflow examples, and safety rules\n- "reference/tools.md" — Complete parameter reference for all 37 tools with detailed examples\n- "all" — Returns both files concatenated (full documentation)'
+        ),
+    },
+    async ({ file }) => {
+      try {
+        // Find project root by looking for package.json
+        let dir = process.cwd();
+        let root = "";
+        for (let i = 0; i < 5; i++) {
+          try {
+            await fs.access(path.join(dir, "package.json"));
+            root = dir;
+            break;
+          } catch {
+            dir = path.dirname(dir);
+          }
+        }
+        if (!root) {
+          // Fallback: try relative to the script location
+          root = path.resolve(__dirname, "..", "..");
+        }
+
+        const skillDir = path.join(root, "skill");
+        const files: string[] = [];
+        const contents: string[] = [];
+
+        if (file === "SKILL.md" || file === "all") {
+          files.push("SKILL.md");
+        }
+        if (file === "reference/tools.md" || file === "all") {
+          files.push("reference/tools.md");
+        }
+
+        for (const f of files) {
+          const filePath = path.join(skillDir, f);
+          try {
+            const content = await fs.readFile(filePath, "utf-8");
+            contents.push(`=== ${f} ===\n${content}`);
+          } catch {
+            contents.push(`=== ${f} ===\nERROR: File not found at ${filePath}`);
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: contents.join("\n\n"),
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            { type: "text" as const, text: `ERROR: ${error.message}` },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
   // ═══════════════════════════════════════════════════════════════════════
 }

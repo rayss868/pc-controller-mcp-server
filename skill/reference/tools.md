@@ -731,6 +731,26 @@ pc-controller:read_url(url="http://localhost:3000/api/data")
 
 ---
 
+## Documentation
+
+### 38. read_skill_docs
+
+Read the PC Controller skill documentation files. Provides access to the complete AI skill reference — a structured guide describing all 38 available tools, their parameters, usage examples, workflows, and safety rules. Use this tool when you need to understand what capabilities the PC Controller MCP server offers, how to invoke specific tools correctly, or what workflows are available for common tasks. The skill documentation is the authoritative source for tool usage and is updated alongside code changes.
+
+**Parameters:**
+- `file` (string, required): Which documentation file to read: `"SKILL.md"` (overview with workflows), `"reference/tools.md"` (full parameter reference), or `"all"` (both files concatenated)
+
+**Returns:** Full markdown content of the requested skill file(s)
+
+**Examples:**
+```
+pc-controller:read_skill_docs(file="SKILL.md")         # tool overview and workflows
+pc-controller:read_skill_docs(file="reference/tools.md")  # full parameter reference
+pc-controller:read_skill_docs(file="all")              # everything
+```
+
+---
+
 ## Error Handling
 
 All tools return error information when something goes wrong:

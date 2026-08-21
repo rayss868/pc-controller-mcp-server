@@ -41,7 +41,7 @@ Works with any MCP-compatible AI client:
 
 ## ✨ Features
 
-### 🛠️ 37 Powerful Tools
+### 🛠️ 38 Powerful Tools
 
 | Tool | Description |
 |------|-------------|
@@ -82,6 +82,7 @@ Works with any MCP-compatible AI client:
 | **get_recent_tool_calls** | Get recent tool call history |
 | **read_url** | Fetch content from URLs (HTML, JSON, raw text) |
 | **preview_file** | Preview files with inline images (base64), markdown, and code syntax |
+| **read_skill_docs** | Read skill documentation (tool reference, workflows, examples) |
 
 ### 🎨 Key Capabilities
 
@@ -318,7 +319,7 @@ node test/test.js
 ### Test Coverage
 
 - ✅ Protocol handshake (initialize, tools/list)
-- ✅ All 37 tools functionality
+- ✅ All 38 tools functionality
 - ✅ Error handling (invalid commands, non-existent files, unknown tools)
 - ✅ Edge cases and boundary conditions
 
@@ -527,7 +528,7 @@ MIT License - see LICENSE file for details
 ## 🗺️ Roadmap
 
 ### Version 2.1 (Current)
-- [x] 37 tools across 5 modular categories
+- [x] 38 tools across 5 modular categories
 - [x] DesktopCommanderMCP feature parity (except Docker sandbox)
 - [x] File Preview UI with inline base64 images
 - [x] Terminal session management

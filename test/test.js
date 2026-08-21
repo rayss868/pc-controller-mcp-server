@@ -217,13 +217,13 @@ async function runTests() {
         "get_recent_tool_calls",
         "read_url",
         "preview_file",
-        "notify",
+        "read_skill_docs",
       ];
 
       const missing = expectedTools.filter((t) => !toolNames.includes(t));
       logResult(
         "tools/list",
-        missing.length === 0 && toolNames.length === 37,
+        missing.length === 0 && toolNames.length === expectedTools.length,
         `${toolNames.length} tools found${missing.length ? `, missing: ${missing.join(", ")}` : ""}`
       );
     } catch (e) {
