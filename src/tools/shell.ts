@@ -10,11 +10,20 @@ export function registerShellTools(server: McpServer) {
   server.tool(
     "run_command",
     `Execute a shell command on this Windows PC and return its output.
-  Use this tool to run any CLI command: package installation (npm, pip, cargo), code compilation,
-  file management via CLI, registry queries, network diagnostics (ping, tracert, ipconfig),
-  git operations, build scripts, or anything that can run in a terminal. Default shell is PowerShell
-  with a timeout of 30 seconds. Returns both STDOUT and STDERR. The 'shell' parameter switches to
-  Git Bash or WSL for Unix-style commands (ls, grep, bash scripts).
+  This is the UNIVERSAL tool of this server: anything PowerShell, Git Bash, or WSL can do can be
+  done here — document parsing (Word/Excel COM automation, pdftotext), registry queries, Windows
+  services, network diagnostics, environment variables, scheduled tasks, WMI, and any CLI program.
+  There is no task that strictly requires another tool; dedicated tools (file_read, screen_capture,
+  clipboard_get, etc.) are conveniences — use them ONLY when clearly simpler than the equivalent
+  command, otherwise run a command.
+  Common uses: package installation (npm, pip), compilation, git operations, build scripts,
+  file management via CLI, network diagnostics (ping, tracert, ipconfig).
+  Default shell is PowerShell with a timeout of 30 seconds. Returns both STDOUT and STDERR.
+  The 'shell' parameter switches to Git Bash or WSL for Unix-style commands (ls, grep, bash scripts).
+  Examples:
+  - "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5"
+  - "$w = New-Object -ComObject Word.Application; $d = $w.Documents.Open('C:\\docs\\file.docx'); $d.Content.Text; $d.Close(); $w.Quit()"  # read DOCX text
+  - "python -c \\"import pypdf,sys; print('\\\\n'.join(p.extract_text() for p in pypdf.PdfReader(sys.argv[1]).pages))\\" C:\\docs\\file.pdf"  # read PDF text
   WARNING: Dangerous commands will still execute — make sure the command is correct before running.`,
     {
       command: z

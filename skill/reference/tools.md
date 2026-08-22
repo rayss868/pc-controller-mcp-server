@@ -10,6 +10,8 @@ Complete parameter reference for all 37 tools in the pc-controller MCP server.
 
 Execute shell commands with timeout control. Default shell is PowerShell; Git Bash and WSL are available via the `shell` parameter.
 
+**This is the universal tool of the server.** Anything a shell can do can be done here — there is no task that strictly requires another tool. Dedicated tools (file_read, screen_capture, clipboard_get, zip_create, ...) are conveniences: use them ONLY when clearly simpler than the equivalent command, otherwise run a command. Examples of command-first tasks: parsing DOCX via Word COM, reading PDFs via `pdftotext` or Python `pypdf`, querying registry/services/scheduled tasks/WMI, environment variables, network diagnostics.
+
 **Parameters:**
 - `command` (string, required): Shell command to execute
 - `cwd` (string, optional): Working directory (absolute path). Default: user home directory
@@ -25,6 +27,8 @@ pc-controller:run_command(command="npm install", cwd="C:\\Users\\<username>\\Pro
 pc-controller:run_command(command="ls -la", shell="gitbash")
 pc-controller:run_command(command="grep -r 'TODO' src", cwd="C:\\Users\\<username>\\Projects\\app", shell="gitbash")
 pc-controller:run_command(command="df -h && free -m", shell="wsl")
+pc-controller:run_command(command="$w = New-Object -ComObject Word.Application; $d = $w.Documents.Open('C:\\Users\\<username>\\docs\\file.docx'); $d.Content.Text; $d.Close(); $w.Quit()")
+pc-controller:run_command(command="pdftotext C:\\Users\\<username>\\docs\\file.pdf -")  # requires poppler
 ```
 
 **Notes:**

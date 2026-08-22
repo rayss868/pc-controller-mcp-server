@@ -7,6 +7,48 @@ description: Control a Windows PC via MCP tools — execute shell commands, read
 
 Control this Windows PC using the `pc-controller` MCP server (38 tools). All tools run via PowerShell on Windows 10/11.
 
+## Command-First Principle
+
+**`run_command` is the universal center.** Anything PowerShell/Git Bash/WSL can do, it can do — there is no task that requires a dedicated tool. Dedicated tools are conveniences: use one **only when it is clearly simpler** than writing the equivalent command.
+
+Decision rule:
+1. Is there a dedicated tool that solves this in one obvious call? → use the tool
+2. Otherwise → use `run_command` (or `run_command_long` / `execute_code`)
+
+### Use tools when simple
+
+| Task | Use |
+|------|-----|
+| Read/edit small text file | `file_read` / `file_edit` |
+| View image inline | `preview_file` |
+| See the screen | `screen_capture` |
+| Copy/paste clipboard text | `clipboard_get` / `clipboard_set` |
+| Kill a known process | `process_kill` |
+| Zip/unzip archive | `zip_create` / `zip_extract` |
+
+### Fall back to run_command for everything else
+
+Anything not covered above — document parsing, registry, services, network diagnostics, environment variables, scheduled tasks, WMI queries, multimedia metadata, etc. Examples:
+
+```powershell
+# Read DOCX text (Word COM)
+$w = New-Object -ComObject Word.Application; $d = $w.Documents.Open("C:\path\file.docx"); $d.Content.Text; $d.Close(); $w.Quit()
+
+# Read XLSX data (Excel COM)
+$x = New-Object -ComObject Excel.Application; $wb = $x.Workbooks.Open("C:\path\file.xlsx"); $wb.Sheets.Item(1).UsedRange.Value2
+
+# Read PDF text (requires pdftotext: scoop install poppler / choco install poppler)
+pdftotext C:\path\file.pdf -
+
+# Read PDF via Python (no extra CLI needed)
+python -c "import pypdf,sys; print('\n'.join(p.extract_text() for p in pypdf.PdfReader(sys.argv[1]).pages))" C:\path\file.pdf
+
+# Environment variables, registry, services
+Get-ChildItem Env:  |  Get-ItemProperty "HKLM:\SOFTWARE\..."  |  Get-Service
+```
+
+When in doubt, just run the command.
+
 ## Tool Reference
 
 ### Shell Execution
