@@ -108,7 +108,7 @@ Works with any MCP-compatible AI client:
 
 ```bash
 # Clone or download this repository
-cd D:\All_project\own\AI_Coder\MCP_Tools\pc_controller
+cd pc-controller-mcp-server
 
 # Install dependencies
 npm install
@@ -143,7 +143,7 @@ Edit: `%APPDATA%\Claude\claude_desktop_config.json`
   "mcpServers": {
     "pc-controller": {
       "command": "node",
-      "args": ["D:\\All_project\\own\\AI_Coder\\MCP_Tools\\pc_controller\\dist\\index.js"]
+      "args": ["<path-to-repo>\\dist\\index.js"]
     }
   }
 }
@@ -158,7 +158,7 @@ Edit: `~/.cursor/mcp.json`
   "mcpServers": {
     "pc-controller": {
       "command": "node",
-      "args": ["D:\\All_project\\own\\AI_Coder\\MCP_Tools\\pc_controller\\dist\\index.js"]
+      "args": ["<path-to-repo>\\dist\\index.js"]
     }
   }
 }
@@ -173,7 +173,7 @@ Edit: `~/.codeium/windsurf/mcp_config.json`
   "mcpServers": {
     "pc-controller": {
       "command": "node",
-      "args": ["D:\\All_project\\own\\AI_Coder\\MCP_Tools\\pc_controller\\dist\\index.js"]
+      "args": ["<path-to-repo>\\dist\\index.js"]
     }
   }
 }
@@ -188,7 +188,7 @@ Edit: `~/.openclaude/config.json`
   "mcpServers": {
     "pc-controller": {
       "command": "node",
-      "args": ["D:\\All_project\\own\\AI_Coder\\MCP_Tools\\pc_controller\\dist\\index.js"]
+      "args": ["<path-to-repo>\\dist\\index.js"]
     }
   }
 }

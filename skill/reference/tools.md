@@ -21,9 +21,9 @@ Execute shell commands with timeout control. Default shell is PowerShell; Git Ba
 **Examples:**
 ```
 pc-controller:run_command(command="dir C:\\Users")
-pc-controller:run_command(command="npm install", cwd="D:\\Projects\\app")
+pc-controller:run_command(command="npm install", cwd="C:\\Users\\<username>\\Projects\\app")
 pc-controller:run_command(command="ls -la", shell="gitbash")
-pc-controller:run_command(command="grep -r 'TODO' src", cwd="D:\\Projects\\app", shell="gitbash")
+pc-controller:run_command(command="grep -r 'TODO' src", cwd="C:\\Users\\<username>\\Projects\\app", shell="gitbash")
 pc-controller:run_command(command="df -h && free -m", shell="wsl")
 ```
 
@@ -47,9 +47,9 @@ Execute long-running shell commands with extended timeout.
 
 **Examples:**
 ```
-pc-controller:run_command_long(command="npm install", cwd="D:\\Projects\\app")
-pc-controller:run_command_long(command="git clone https://github.com/user/repo.git", cwd="D:\\Projects")
-pc-controller:run_command_long(command="cargo build --release", cwd="D:\\Rust\\project")
+pc-controller:run_command_long(command="npm install", cwd="C:\\Users\\<username>\\Projects\\app")
+pc-controller:run_command_long(command="git clone https://github.com/user/repo.git", cwd="C:\\Users\\<username>\\Projects")
+pc-controller:run_command_long(command="cargo build --release", cwd="C:\\Users\\<username>\\Projects\\rust-project")
 ```
 
 **Notes:**
@@ -98,9 +98,9 @@ Read text file contents with encoding support and line-range selection.
 
 **Examples:**
 ```
-pc-controller:file_read(path="C:\\Users\\rayss\\Documents\\config.json")
-pc-controller:file_read(path="D:\\logs\\app.log", offset=-100)  # last 100 lines
-pc-controller:file_read(path="D:\\src\\index.ts", offset=50, limit=100)  # lines 50-150
+pc-controller:file_read(path="C:\\Users\\<username>\\Documents\\config.json")
+pc-controller:file_read(path="C:\\Users\\<username>\\logs\\app.log", offset=-100)  # last 100 lines
+pc-controller:file_read(path="C:\\Users\\<username>\\Projects\\app\\src\\index.ts", offset=50, limit=100)  # lines 50-150
 ```
 
 **Notes:**
@@ -122,8 +122,8 @@ Write text content to files with auto-directory creation.
 
 **Examples:**
 ```
-pc-controller:file_write(path="D:\\output.txt", content="Hello World")
-pc-controller:file_write(path="C:\\Users\\rayss\\config.json", content="{\"key\": \"value\"}")
+pc-controller:file_write(path="C:\\Users\\<username>\\Desktop\\output.txt", content="Hello World")
+pc-controller:file_write(path="C:\\Users\\<username>\\Documents\\config.json", content="{\"key\": \"value\"}")
 ```
 
 **Notes:**
@@ -147,8 +147,8 @@ Surgical search & replace — edit specific text without overwriting the entire 
 
 **Examples:**
 ```
-pc-controller:file_edit(path="D:\\config.json", old_string="port: 3000", new_string="port: 8080")
-pc-controller:file_edit(path="D:\\src\\app.ts", old_string="const DEBUG = false", new_string="const DEBUG = true")
+pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_string="port: 3000", new_string="port: 8080")
+pc-controller:file_edit(path="C:\\Users\\<username>\\Projects\\app\\src\\app.ts", old_string="const DEBUG = false", new_string="const DEBUG = true")
 ```
 
 **Notes:**
@@ -170,8 +170,8 @@ Move or rename files and directories (auto-creates destination folders).
 
 **Examples:**
 ```
-pc-controller:file_move(source="D:\\old.txt", destination="D:\\archive\\old.txt")
-pc-controller:file_move(source="D:\\project", destination="E:\\backup\\project")
+pc-controller:file_move(source="C:\\Users\\<username>\\old.txt", destination="C:\\Users\\<username>\\archive\\old.txt")
+pc-controller:file_move(source="C:\\Users\\<username>\\project", destination="D:\\backup\\project")
 ```
 
 ---
@@ -187,7 +187,7 @@ Get file metadata — size, created/modified dates, read-only status.
 
 **Examples:**
 ```
-pc-controller:file_info(path="D:\\Projects\\app\\package.json")
+pc-controller:file_info(path="C:\\Users\\<username>\\Projects\\app\\package.json")
 ```
 
 ---
@@ -205,8 +205,8 @@ Read last N lines or bytes of a file (Unix tail equivalent).
 
 **Examples:**
 ```
-pc-controller:file_tail(path="D:\\logs\\app.log", lines=50)
-pc-controller:file_tail(path="D:\\logs\\app.log", bytes=1024)
+pc-controller:file_tail(path="C:\\Users\\<username>\\logs\\app.log", lines=50)
+pc-controller:file_tail(path="C:\\Users\\<username>\\logs\\app.log", bytes=1024)
 ```
 
 ---
@@ -225,8 +225,8 @@ Search files by glob pattern recursively.
 **Examples:**
 ```
 pc-controller:file_search(pattern="*.txt")
-pc-controller:file_search(pattern="*.json", directory="D:\\Projects")
-pc-controller:file_search(pattern="*.log", directory="D:\\logs", max_results=100)
+pc-controller:file_search(pattern="*.json", directory="C:\\Users\\<username>\\Projects")
+pc-controller:file_search(pattern="*.log", directory="C:\\Users\\<username>\\logs", max_results=100)
 ```
 
 ---
@@ -245,8 +245,8 @@ Search text inside files recursively (grep-like, with line numbers).
 
 **Examples:**
 ```
-pc-controller:content_search(pattern="TODO", directory="D:\\Projects\\src")
-pc-controller:content_search(pattern="function login", directory="D:\\app", file_pattern="*.ts")
+pc-controller:content_search(pattern="TODO", directory="C:\\Users\\<username>\\Projects\\src")
+pc-controller:content_search(pattern="function login", directory="C:\\Users\\<username>\\Projects\\app", file_pattern="*.ts")
 ```
 
 ---
@@ -262,7 +262,7 @@ Read contents of multiple files simultaneously.
 
 **Examples:**
 ```
-pc-controller:read_multiple_files(paths=["D:\\a.txt", "D:\\b.txt", "D:\\c.json"])
+pc-controller:read_multiple_files(paths=["C:\\Users\\<username>\\a.txt", "C:\\Users\\<username>\\b.txt", "C:\\Users\\<username>\\c.json"])
 ```
 
 ---
@@ -281,8 +281,8 @@ List directory contents with optional recursion.
 **Examples:**
 ```
 pc-controller:dir_list()
-pc-controller:dir_list(path="C:\\Users\\rayss\\Desktop")
-pc-controller:dir_list(path="D:\\Projects", recursive=true, depth=2)
+pc-controller:dir_list(path="C:\\Users\\<username>\\Desktop")
+pc-controller:dir_list(path="C:\\Users\\<username>\\Projects", recursive=true, depth=2)
 ```
 
 ---
@@ -298,7 +298,7 @@ Create directories recursively (mkdir -p equivalent).
 
 **Examples:**
 ```
-pc-controller:create_directory(path="D:\\Projects\\new-app\\src\\components")
+pc-controller:create_directory(path="C:\\Users\\<username>\\Projects\\new-app\\src\\components")
 ```
 
 ---
@@ -315,8 +315,8 @@ Copy files or directories to a new location.
 
 **Examples:**
 ```
-pc-controller:copy_file(source="D:\\config.json", destination="D:\\backup\\config.json")
-pc-controller:copy_file(source="D:\\project", destination="E:\\backup\\project")
+pc-controller:copy_file(source="C:\\Users\\<username>\\config.json", destination="C:\\Users\\<username>\\Desktop\\config.json")
+pc-controller:copy_file(source="C:\\Users\\<username>\\project", destination="D:\\backup\\project")
 ```
 
 ---
@@ -333,8 +333,8 @@ Delete files or directories permanently.
 
 **Examples:**
 ```
-pc-controller:delete_file(path="D:\\temp\\old-file.txt")
-pc-controller:delete_file(path="D:\\temp\\old-folder", recursive=true)
+pc-controller:delete_file(path="C:\\Users\\<username>\\temp\\old-file.txt")
+pc-controller:delete_file(path="C:\\Users\\<username>\\temp\\old-folder", recursive=true)
 ```
 
 **Notes:**
@@ -354,9 +354,9 @@ Preview file contents with rich formatting. Images returned as base64 for inline
 
 **Examples:**
 ```
-pc-controller:preview_file(path="C:\\Users\\me\\photo.png")  # inline base64 image
-pc-controller:preview_file(path="D:\\project\\README.md")  # markdown with stats
-pc-controller:preview_file(path="D:\\project\\src\\index.ts")  # code with metadata
+pc-controller:preview_file(path="C:\\Users\\<username>\\Pictures\\photo.png")  # inline base64 image
+pc-controller:preview_file(path="C:\\Users\\<username>\\Projects\\app\\README.md")  # markdown with stats
+pc-controller:preview_file(path="C:\\Users\\<username>\\Projects\\app\\src\\index.ts")  # code with metadata
 ```
 
 **Notes:**
@@ -379,7 +379,7 @@ Capture screenshot of primary monitor.
 **Examples:**
 ```
 pc-controller:screen_capture()
-pc-controller:screen_capture(output_path="C:\\Screenshots\\screen.png")
+pc-controller:screen_capture(output_path="C:\\Users\\<username>\\Pictures\\screen.png")
 ```
 
 ---
@@ -455,7 +455,7 @@ Open files, folders, or URLs with default applications.
 ```
 pc-controller:open_path(target="C:\\Documents\\report.pdf")
 pc-controller:open_path(target="https://google.com")
-pc-controller:open_path(target="C:\\Users\\rayss\\Desktop")
+pc-controller:open_path(target="C:\\Users\\<username>\\Desktop")
 ```
 
 ---
@@ -504,8 +504,8 @@ Create a ZIP archive from files or folders.
 
 **Examples:**
 ```
-pc-controller:zip_create(source="D:\\Projects\\myapp", destination="D:\\backup\\myapp.zip")
-pc-controller:zip_create(source="D:\\logs\\*.log", destination="D:\\backup\\logs.zip")
+pc-controller:zip_create(source="C:\\Users\\<username>\\Projects\\app", destination="C:\\Users\\<username>\\Desktop\\myapp.zip")
+pc-controller:zip_create(source="C:\\Users\\<username>\\logs\\*.log", destination="C:\\Users\\<username>\\Desktop\\logs.zip")
 ```
 
 ---
@@ -522,7 +522,7 @@ Extract a ZIP archive to a destination folder.
 
 **Examples:**
 ```
-pc-controller:zip_extract(archive="D:\\downloads\\backup.zip", destination="D:\\Projects\\myapp")
+pc-controller:zip_extract(archive="C:\\Users\\<username>\\Downloads\\backup.zip", destination="C:\\Users\\<username>\\Projects\\app")
 ```
 
 ---

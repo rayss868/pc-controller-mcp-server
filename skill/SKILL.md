@@ -18,10 +18,10 @@ Control this Windows PC using the `pc-controller` MCP server (38 tools). All too
 | `pc-controller:execute_code` | Run Python/Node.js/R code in memory without saving files |
 
 ```
-pc-controller:run_command(command="git status", cwd="D:\\Projects\\myapp")
+pc-controller:run_command(command="git status", cwd="C:\\Users\\<username>\\Projects\\myapp")
 pc-controller:run_command(command="ls -la", shell="gitbash")
 pc-controller:run_command(command="sudo apt update", shell="wsl")
-pc-controller:run_command_long(command="npm install", cwd="D:\\Projects\\myapp")
+pc-controller:run_command_long(command="npm install", cwd="C:\\Users\\<username>\\Projects\\myapp")
 pc-controller:execute_code(language="python", code="print(sum(range(1, 101)))")
 ```
 
@@ -44,17 +44,17 @@ pc-controller:execute_code(language="python", code="print(sum(range(1, 101)))")
 | `pc-controller:delete_file` | Delete files or directories permanently |
 | `pc-controller:preview_file` | Preview files with inline images (base64), markdown stats, and code metadata |
 
-**Always use absolute paths** (e.g., `C:\Users\rayss\Documents\config.json`).
+**Always use absolute paths** (e.g., `C:\Users\<username>\Documents\config.json`).
 
 ```
-pc-controller:file_read(path="D:\\config.json")
-pc-controller:file_read(path="D:\\logs\\app.log", offset=-100)  # last 100 lines
-pc-controller:file_edit(path="D:\\config.json", old_string="port: 3000", new_string="port: 8080")
-pc-controller:file_move(source="D:\\old.txt", destination="D:\\archive\\old.txt")
-pc-controller:content_search(pattern="TODO", directory="D:\\Projects\\src")
-pc-controller:preview_file(path="C:\\Users\\me\\photo.png")  # returns base64 image
-pc-controller:dir_list(path="C:\\Users\\rayss\\Desktop", recursive=true)
-pc-controller:file_search(pattern="*.log", directory="D:\\logs", max_results=100)
+pc-controller:file_read(path="C:\\Users\\<username>\\config.json")
+pc-controller:file_read(path="C:\\Users\\<username>\\logs\\app.log", offset=-100)  # last 100 lines
+pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_string="port: 3000", new_string="port: 8080")
+pc-controller:file_move(source="C:\\Users\\<username>\\old.txt", destination="C:\\Users\\<username>\\archive\\old.txt")
+pc-controller:content_search(pattern="TODO", directory="C:\\Users\\<username>\\Projects\\src")
+pc-controller:preview_file(path="C:\\Users\\<username>\\Pictures\\photo.png")  # returns base64 image
+pc-controller:dir_list(path="C:\\Users\\<username>\\Desktop", recursive=true)
+pc-controller:file_search(pattern="*.log", directory="C:\\Users\\<username>\\logs", max_results=100)
 ```
 
 ### Screen Capture
@@ -65,7 +65,7 @@ pc-controller:file_search(pattern="*.log", directory="D:\\logs", max_results=100
 
 ```
 pc-controller:screen_capture()
-pc-controller:screen_capture(output_path="C:\\debug\\screen.png")
+pc-controller:screen_capture(output_path="C:\\Users\\<username>\\Pictures\\screen.png")
 ```
 
 ### System Info
