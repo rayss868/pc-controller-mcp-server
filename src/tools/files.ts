@@ -290,11 +290,18 @@ export function registerFilesTools(server: McpServer) {
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "file_edit",
-    `Edit a file surgically by searching for exact text and replacing it with new text.
-  Unlike file_write which overwrites the entire file, this tool only modifies the specific
-  parts you want to change. Supports multiple occurrences. Always reads the file first to
-  find the exact match, then replaces it. Use this for code edits, config changes, or any
-  targeted text modification where you don't want to rewrite the whole file.`,
+    `Surgically edit a file by searching for exact text and replacing it. Unlike file_write
+  (which overwrites the whole file), this only touches the matched parts. Built for
+  agent-style editing:
+  - Returns a compact git-style unified diff of the change (with a little context), so you
+    can verify the result without re-reading the whole file or waiting on a large payload.
+  - dry_run=true previews the diff WITHOUT writing, so a failed match is caught before any
+    change is committed (avoids retry loops over a bridge/tunnel).
+  - If old_text is NOT found exactly, it returns a helpful "not found" error listing
+    nearby lines to help you adjust the search.
+  Use this for code edits, config changes, renaming variables, or any targeted
+  modification. For many small edits in sequence, prefer file_edit_batch to do them in
+  one round-trip.`,
     {
       path: z
         .string()
@@ -304,7 +311,7 @@ export function registerFilesTools(server: McpServer) {
       old_text: z
         .string()
         .describe(
-          "Exact text to find and replace. Must match exactly including whitespace and indentation.\nTip: Use file_read with offset/limit first to get the exact text, then use file_edit."
+          "Exact text to find and replace. Must match exactly including whitespace and indentation. If it does not match, the tool reports nearby lines to help you fix the search."
         ),
       new_text: z
         .string()
@@ -317,8 +324,14 @@ export function registerFilesTools(server: McpServer) {
         .describe(
           "If true, replace ALL occurrences of old_text. If false (default), replace only the first occurrence. Use replace_all=true to rename variables across a file."
         ),
+      dry_run: z
+        .boolean()
+        .optional()
+        .describe(
+          "If true, compute and return the diff without writing to disk. Use this first to preview a change before committing it. Default: false."
+        ),
     },
-    async ({ path: filePath, old_text, new_text, replace_all }) => {
+    async ({ path: filePath, old_text, new_text, replace_all, dry_run }) => {
       try {
         let content = await fs.readFile(filePath, "utf-8");
         if (!content.includes(old_text)) {
@@ -326,32 +339,51 @@ export function registerFilesTools(server: McpServer) {
             content: [
               {
                 type: "text" as const,
-                text: `ERROR: old_text not found in ${filePath}`,
+                text: buildNotFoundMessage(filePath, content, old_text),
               },
             ],
             isError: true,
           };
         }
-  
+
         let count: number;
+        const firstIdx = content.indexOf(old_text);
+        let newContent = content;
         if (replace_all) {
           const parts = content.split(old_text);
           count = parts.length - 1;
-          content = parts.join(new_text);
+          newContent = parts.join(new_text);
         } else {
           const idx = content.indexOf(old_text);
-          content = content.substring(0, idx) + new_text + content.substring(idx + old_text.length);
+          newContent =
+            content.substring(0, idx) + new_text + content.substring(idx + old_text.length);
           count = 1;
         }
-  
-        await fs.writeFile(filePath, content, "utf-8");
+
+        const diff = buildEditDiff(content, firstIdx, old_text, new_text);
+
+        const executed = dry_run ? false : true;
+        if (!dry_run) {
+          await fs.writeFile(filePath, newContent, "utf-8");
+        }
+
+        const changed = count > 0;
         return {
           content: [
             {
               type: "text" as const,
-              text: `Replaced ${count} occurrence(s) in ${filePath}`,
+              text:
+                `${dry_run ? "DRY RUN (not written)" : `Replaced ${count} occurrence(s) in ${filePath}`}\n` +
+                `\`\`\`diff\n${diff}\n\`\`\``,
             },
           ],
+          structuredContent: {
+            path: filePath,
+            executed,
+            dryRun: dry_run ?? false,
+            replaced: changed ? count : 0,
+            diff,
+          },
         };
       } catch (error: any) {
         return {
@@ -863,4 +895,302 @@ export function registerFilesTools(server: McpServer) {
       }
     }
   );
+
+  // ═══════════════════════════════════════════════════════════════════════
+
+  //  TOOL 39: Batch Edit File (multiple precise edits in one round-trip)
+  // ═══════════════════════════════════════════════════════════════════════
+  server.tool(
+    "file_edit_batch",
+    `Apply multiple surgical edits to a single file in one round-trip, in order.
+  Each edit searches for exact old_text and replaces it with new_text. This is the
+  agent-friendly way to make several small changes to a code/config file without
+  issuing one file_edit call per change and without re-reading the file between edits.
+  Edits are applied sequentially to the same file, so each old_text must match the text
+  as it exists AFTER the previous edits. The response reports each edit's git-style diff
+  for verification. dry_run=true previews all diffs WITHOUT writing, catching any failed
+  match before anything is committed (anti-retry over a bridge/tunnel). If any edit fails
+  to find its old_text, the remaining edits are still attempted (non-atomic) and the
+  failures are listed in the response.`,
+    {
+      path: z
+        .string()
+        .describe(
+          "Absolute path to the file to edit.\nExample: D:\\Projects\\app\\src\\index.ts"
+        ),
+      edits: z
+        .array(
+          z.object({
+            old_text: z
+              .string()
+              .describe(
+                "Exact text to find and replace in the file's CURRENT state (after prior edits in this batch)."
+              ),
+            new_text: z
+              .string()
+              .describe(
+                "Text to replace the old_text with. Empty string deletes the old_text."
+              ),
+            replace_all: z
+              .boolean()
+              .optional()
+              .describe(
+                "If true, replace ALL occurrences of old_text. If false (default), replace only the first occurrence."
+              ),
+          })
+        )
+        .describe("List of edits to apply, in order."),
+      dry_run: z
+        .boolean()
+        .optional()
+        .describe(
+          "If true, compute and return all diffs without writing to disk. Use this first to preview a batch before committing. Default: false."
+        ),
+    },
+    async ({ path: filePath, edits, dry_run }) => {
+      const results: string[] = [];
+      const editResults: Array<{
+        index: number;
+        status: string;
+        replaced: number;
+        diff?: string;
+      }> = [];
+      let content: string;
+      try {
+        content = await fs.readFile(filePath, "utf-8");
+      } catch (error: any) {
+        return {
+          content: [{ type: "text" as const, text: `ERROR reading ${filePath}: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      let hasError = false;
+      for (let i = 0; i < edits.length; i++) {
+        const { old_text, new_text, replace_all } = edits[i];
+        if (!content.includes(old_text)) {
+          hasError = true;
+          results.push(
+            `Edit ${i + 1} FAILED: old_text not found.\n` +
+              buildNotFoundMessage(filePath, content, old_text)
+          );
+          editResults.push({ index: i + 1, status: "failed", replaced: 0 });
+          continue;
+        }
+        const firstIdx = content.indexOf(old_text);
+        let count: number;
+        const prevContent = content;
+        if (replace_all) {
+          const parts = content.split(old_text);
+          count = parts.length - 1;
+          content = parts.join(new_text);
+        } else {
+          const idx = content.indexOf(old_text);
+          content = content.substring(0, idx) + new_text + content.substring(idx + old_text.length);
+          count = 1;
+        }
+        const diff = buildEditDiff(prevContent, firstIdx, old_text, new_text);
+        results.push(
+          `Edit ${i + 1} OK: replaced ${count} occurrence(s).\n\`\`\`diff\n${diff}\n\`\`\``
+        );
+        editResults.push({ index: i + 1, status: "ok", replaced: count, diff });
+      }
+
+      const executed = dry_run ? false : true;
+      if (!dry_run) {
+        try {
+          await fs.writeFile(filePath, content, "utf-8");
+        } catch (error: any) {
+          return {
+            content: [{ type: "text" as const, text: `ERROR writing ${filePath}: ${error.message}` }],
+            isError: true,
+          };
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Applied ${edits.length} edit(s) to ${filePath} (${dry_run ? "DRY RUN, not written" : "written"})\n\n` +
+              results.join("\n\n"),
+          },
+        ],
+        structuredContent: {
+          path: filePath,
+          executed,
+          dryRun: dry_run ?? false,
+          edits: editResults,
+        },
+        isError: hasError || undefined,
+      };
+    }
+  );
+}
+
+/**
+ * Render a small window of the file's lines around a character offset with line
+ * numbers, so the AI can verify the result of an edit without re-reading the file.
+ */
+function buildEditContext(newText: string, insertOffset: number, fullContent: string): string {
+  const lines = fullContent.split("\n");
+  const end = fullContent.indexOf(newText, insertOffset);
+  const anchorStart = insertOffset;
+  const anchorEnd = end >= 0 ? end + newText.length : insertOffset + newText.length;
+
+  let startLine = 0;
+  let startCol = 0;
+  let endLine = 0;
+  let endCol = 0;
+  let pos = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const lineLen = lines[i].length + 1; // +1 for the newline
+    if (pos <= anchorStart && anchorStart < pos + lineLen) {
+      startLine = i;
+      startCol = anchorStart - pos;
+    }
+    if (pos <= anchorEnd && anchorEnd <= pos + lineLen) {
+      endLine = i;
+      endCol = anchorEnd - pos;
+    }
+    pos += lineLen;
+  }
+
+  const ctxStart = Math.max(0, startLine - 2);
+  const ctxEnd = Math.min(lines.length - 1, endLine + 2);
+  const rangeWidth = String(ctxEnd + 1).length;
+  const out: string[] = [];
+  for (let i = ctxStart; i <= ctxEnd; i++) {
+    const marker = i >= startLine && i <= endLine ? ">" : " ";
+    out.push(`${marker}${String(i + 1).padStart(rangeWidth)}| ${lines[i]}`);
+  }
+  return out.join("\n");
+}
+
+/**
+ * When old_text is not found, help the AI correct itself by showing the lines most
+ * likely to contain the intended match plus a clear hint.
+ */
+function buildNotFoundMessage(filePath: string, content: string, oldText: string): string {
+  const lines = content.split("\n");
+  const hintLine = findClosestLine(content, oldText);
+  const ctxStart = Math.max(0, hintLine - 2);
+  const ctxEnd = Math.min(lines.length - 1, hintLine + 2);
+  const rangeWidth = String(ctxEnd + 1).length;
+  const out: string[] = [];
+  for (let i = ctxStart; i <= ctxEnd; i++) {
+    out.push(`${String(i + 1).padStart(rangeWidth)}| ${lines[i]}`);
+  }
+  return (
+    `old_text not found exactly in ${filePath}.\n` +
+    `TightTip: use file_read to copy the exact line (including indentation/whitespace).\n` +
+    `Closest lines (around line ${hintLine + 1}):\n${out.join("\n")}`
+  );
+}
+
+/**
+ * Naively pick the line most likely to contain oldText by scoring character overlap.
+ */
+function findClosestLine(content: string, oldText: string): number {
+  const lines = content.split("\n");
+  const search = oldText.toLowerCase();
+  let bestLine = 0;
+  let bestScore = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase();
+    let score = 0;
+    for (let j = 0; j < search.length; j++) {
+      const ch = search[j];
+      if (ch === " " || ch === "\t") continue;
+      if (line.indexOf(ch) >= 0) score += 1;
+    }
+    const run = longestCommonRun(line, search);
+    score += run * run;
+    if (score > bestScore) {
+      bestScore = score;
+      bestLine = i;
+    }
+  }
+  return bestLine;
+}
+
+/**
+ * Length of the longest contiguous character run shared by two strings (case-insensitive).
+ * Used to rank candidate lines.
+ */
+function longestCommonRun(a: string, b: string): number {
+  let best = 0;
+  for (let start = 0; start < a.length; start++) {
+    let k = 0;
+    while (start + k < a.length && k < b.length && a[start + k] === b[k]) {
+      k++;
+    }
+    if (k > best) best = k;
+  }
+  return best;
+}
+
+/**
+ * Build a compact git-style unified diff (hunk headers + +/- lines) between two file
+ * contents. This is the lightweight way to show an AI exactly what changed without
+ * echoing the whole file back over the MCP transport (which is what slows editing
+ * down through a tunnel/bridge).
+ */
+/**
+ * Build a git-style unified diff for a single known surgical edit. Because the edit is
+ * an exact old_text -> new_text replacement at a known offset, we can emit one correct
+ * hunk directly (removed lines old_text, added lines new_text) wrapped with a small
+ * amount of context. This keeps the payload tiny over a bridge/tunnel and is far more
+ * reliable than a general-purpose diff engine for this use case.
+ */
+function buildEditDiff(
+  oldContent: string,
+  offset: number,
+  oldText: string,
+  newText: string,
+  maxContext = 3
+): string {
+  const before = oldContent.slice(0, offset);
+  const after = oldContent.slice(offset + oldText.length);
+
+  const oldLines = oldContent.replace(/\r\n/g, "\n").split("\n");
+  const beforeCount = countNewlines(before);
+  const removedLines = oldText.split("\n");
+  const addedLines = newText.split("\n");
+
+  const hunkStartOld = beforeCount + 1;
+  // New content line numbers: start = lines before edit + 1
+  const hunkStartNew = beforeCount + 1;
+
+  // Compute how many old/new lines the hunk spans.
+  // For old: lines before + removed lines + (up to maxContext) lines after.
+  const afterLines = after.split("\n");
+  const contextBefore = oldLines.slice(Math.max(0, beforeCount - maxContext), beforeCount);
+  const contextAfter = afterLines.slice(0, maxContext);
+
+  const oldHunkLines = [...contextBefore, ...removedLines, ...contextAfter];
+  const newHunkLines = [...contextBefore, ...addedLines, ...contextAfter];
+  const oldCount = oldHunkLines.length;
+  const newCount = newHunkLines.length;
+
+  // 1-based hunk start lines (adjusted for the contextBefore pulled in).
+  const aStart = Math.max(1, hunkStartOld - contextBefore.length);
+  const bStart = Math.max(1, hunkStartNew - contextBefore.length);
+
+  const out: string[] = [];
+  out.push(`@@ -${aStart},${oldCount} +${bStart},${newCount} @@`);
+  for (const line of contextBefore) out.push(" " + (line === "" ? "" : line));
+  for (const line of removedLines) out.push("-" + line);
+  for (const line of addedLines) out.push("+" + line);
+  for (const line of contextAfter) out.push(" " + line);
+  return out.join("\n");
+}
+
+function countNewlines(s: string): number {
+  let count = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\n") count++;
+  }
+  return count;
 }

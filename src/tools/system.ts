@@ -5,6 +5,52 @@ import * as path from "path";
 import * as os from "os";
 import { execAsync, formatBytes } from "../helpers.js";
 
+async function openWithoutFocus(target: string): Promise<void> {
+  const encodedTarget = Buffer.from(target, "utf8").toString("base64");
+  const script = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+public struct PcControllerShellExecuteInfo {
+  public int cbSize;
+  public uint fMask;
+  public IntPtr hwnd;
+  public string lpVerb;
+  public string lpFile;
+  public string lpParameters;
+  public string lpDirectory;
+  public int nShow;
+  public IntPtr hInstApp;
+  public IntPtr lpIDList;
+  public string lpClass;
+  public IntPtr hkeyClass;
+  public uint dwHotKey;
+  public IntPtr hIcon;
+  public IntPtr hProcess;
+}
+public static class PcControllerShell {
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern bool ShellExecuteEx(ref PcControllerShellExecuteInfo info);
+}
+'@
+$target = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedTarget}'))
+$info = New-Object PcControllerShellExecuteInfo
+$info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($info)
+$info.fMask = 0x0200
+$info.lpVerb = 'open'
+$info.lpFile = $target
+$info.nShow = 4
+if (-not [PcControllerShell]::ShellExecuteEx([ref]$info)) {
+  throw 'ShellExecuteEx failed for the requested target.'
+}
+`;
+  await execAsync(script, {
+    timeout: 15000,
+    shell: "powershell.exe",
+  });
+}
+
 export function registerSystemTools(server: McpServer) {
   //  TOOL 5: Capture Screen Screenshot
   // ═══════════════════════════════════════════════════════════════════════
@@ -328,10 +374,7 @@ export function registerSystemTools(server: McpServer) {
     },
     async ({ target }) => {
       try {
-        await execAsync(
-          `powershell.exe -Command "Start-Process '${target.replace(/'/g, "''")}'"`,
-          { timeout: 10000 }
-        );
+        await openWithoutFocus(target);
         return {
           content: [
             {

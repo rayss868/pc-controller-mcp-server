@@ -1,7 +1,18 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import { config } from "./state.js";
 
 export const execAsync = promisify(exec);
+
+export function isCommandBlocked(command: string): string | null {
+  const normalized = command.toLowerCase();
+  for (const blocked of config.blockedCommands) {
+    if (normalized.includes(blocked.toLowerCase())) {
+      return blocked;
+    }
+  }
+  return null;
+}
 
 export function buildShellCommand(command: string, shell: string): string {
   switch (shell) {

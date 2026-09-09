@@ -41,11 +41,11 @@ Works with any MCP-compatible AI client:
 
 ## ✨ Features
 
-### 🛠️ 38 Powerful Tools
+### 🛠️ 41 Powerful Tools
 
 | Tool | Description |
 |------|-------------|
-| **run_command** | Execute shell commands (PowerShell default; also Git Bash & WSL via `shell` param) |
+| **run_command** | Execute shell commands in one-shot mode or in a persistent streaming terminal (CMD default; PowerShell, Git Bash, and WSL also supported) |
 | **run_command_long** | Run long-running commands with extended timeout (2 minutes) |
 | **file_read** | Read file contents with encoding support |
 | **file_write** | Write files with automatic directory creation |
@@ -86,6 +86,9 @@ Works with any MCP-compatible AI client:
 
 ### 🎨 Key Capabilities
 
+- **Persistent Streaming Terminals**: Open a visible CMD/PTY session once, reuse it across commands, stream output in real time, and run multiple independent sessions by ID
+- **Non-Intrusive Windows**: Controller-managed terminal monitors and file/folder/URL launches remain visible without taking focus from your active application
+- **Interactive CLI Support**: PTY/ConPTY support for OpenClaude, database CLIs, prompts, full-screen terminal interfaces, and other interactive processes
 - **Universal Compatibility**: Works with any MCP-compatible AI client
 - **Comprehensive Control**: From file operations to process management
 - **Visual Feedback**: Screenshot capture with base64 encoding for AI viewing
@@ -202,7 +205,17 @@ For ChatGPT web access, you'll need to set up an HTTP bridge server (future enha
 
 ## 📖 Usage Examples
 
-Once configured, you can ask your AI assistant to perform tasks like:
+### Persistent Terminal Streaming
+
+Use `terminal_open` once, wait for its ready confirmation, and then reuse the same `session_id` with `run_command`. The shell process, working directory, environment, and interactive state remain alive between calls. CMD is the default shell; PowerShell, Git Bash, and WSL are also supported.
+
+```text
+terminal_open(session_id="dev", title="OpenAI", cwd="C:\\Users\\<username>\\Projects\\app")
+run_command(session_id="dev", command="npm run dev")
+run_command(session_id="dev", command="status")
+```
+
+Use a different session ID to open another independent terminal. Sessions automatically close after 10 minutes without input or output. The PTY/ConPTY backend supports interactive applications such as OpenClaude, database CLIs, prompts, and full-screen terminal interfaces. Controller-created monitor windows remain visible without taking focus from the application you are using.
 
 ### Shell Commands
 ```
@@ -527,13 +540,18 @@ MIT License - see LICENSE file for details
 
 ## 🗺️ Roadmap
 
-### Version 2.1 (Current)
-- [x] 38 tools across 5 modular categories
-- [x] DesktopCommanderMCP feature parity (except Docker sandbox)
-- [x] File Preview UI with inline base64 images
-- [x] Terminal session management
-- [x] Usage statistics and audit logging
+### Version 2.7 (Current)
+- [x] 41 tools with detailed MCP descriptions
+- [x] Persistent streaming terminals with independent session IDs
+- [x] Windows ConPTY support for interactive CLI applications
+- [x] Visible terminal monitors with ANSI/UTF-8 rendering
+- [x] Non-intrusive window opening that preserves the active foreground window
+- [x] Automatic session cleanup after 10 minutes of inactivity
+
+### Version 2.6
 - [x] Runtime configuration management
+- [x] Usage statistics and audit logging
+- [x] File Preview UI with inline base64 images
 
 ### Version 2.2 (Planned)
 - [ ] Mouse control (click, drag, scroll)

@@ -224,12 +224,12 @@ export function registerAdminTools(server: McpServer) {
   
   // ═══════════════════════════════════════════════════════════════════════
 
-  //  TOOL 38: Read Skill Documentation
+  //  TOOL 39: Read Skill Documentation
   // ═══════════════════════════════════════════════════════════════════════
   server.tool(
     "read_skill_docs",
     `Read the PC Controller skill documentation files. This tool provides access to the
-complete AI skill reference — a structured guide describing all 38 available tools,
+complete AI skill reference — a structured guide describing all 39 available tools,
 their parameters, usage examples, workflows, and safety rules. Use this tool when you
 need to understand what capabilities the PC Controller MCP server offers, how to invoke
 specific tools correctly, or what workflows are available for common tasks. The skill
@@ -239,7 +239,7 @@ changes. Returns the full content of the requested skill file as markdown text.`
       file: z
         .enum(["SKILL.md", "reference/tools.md", "all"])
         .describe(
-          'Which skill documentation file to read:\n- "SKILL.md" — Main skill overview with tool summaries, workflow examples, and safety rules\n- "reference/tools.md" — Complete parameter reference for all 37 tools with detailed examples\n- "all" — Returns both files concatenated (full documentation)'
+          'Which skill documentation file to read:\n- "SKILL.md" — Main skill overview with tool summaries, workflow examples, and safety rules\n- "reference/tools.md" — Complete parameter reference for all 39 tools with detailed examples\n- "all" — Returns both files concatenated (full documentation)'
         ),
     },
     async ({ file }) => {

@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { spawn } from "child_process";
 import * as os from "os";
-import { execAsync, buildShellCommand } from "../helpers.js";
+import { execAsync, buildShellCommand, isCommandBlocked } from "../helpers.js";
+import { getSession, sendCommandAndWait } from "../terminal.js";
 
 export function registerShellTools(server: McpServer) {
   //  TOOL 1: Execute Shell Command
@@ -18,12 +19,26 @@ export function registerShellTools(server: McpServer) {
   command, otherwise run a command.
   Common uses: package installation (npm, pip), compilation, git operations, build scripts,
   file management via CLI, network diagnostics (ping, tracert, ipconfig).
-  Default shell is PowerShell with a timeout of 30 seconds. Returns both STDOUT and STDERR.
-  The 'shell' parameter switches to Git Bash or WSL for Unix-style commands (ls, grep, bash scripts).
+  Default shell is cmd (classic Command Prompt) with a timeout of 30 seconds. Returns both STDOUT and STDERR.
+  The 'shell' parameter switches to PowerShell (Get-Process, COM automation), Git Bash, or WSL
+  for Unix-style commands (ls, grep, bash scripts) when needed.
   Examples:
   - "Get-Process | Sort-Object CPU -Descending | Select-Object -First 5"
   - "$w = New-Object -ComObject Word.Application; $d = $w.Documents.Open('C:\\docs\\file.docx'); $d.Content.Text; $d.Close(); $w.Quit()"  # read DOCX text
   - "python -c \\"import pypdf,sys; print('\\\\n'.join(p.extract_text() for p in pypdf.PdfReader(sys.argv[1]).pages))\\" C:\\docs\\file.pdf"  # read PDF text
+
+  STREAMING MODE (session_id): Two steps. STEP 1 — open a persistent terminal with the
+  terminal_open tool (e.g. terminal_open(session_id="dev")). STEP 2 — pass that same
+  session_id here to stream commands into the already-open terminal in real time: every
+  call with the SAME session_id runs inside that same shell — state (cwd, environment,
+  variables) is kept between calls, and the shell is NOT reopened for each command. Each
+  session_id is an independent terminal, so you can run several streams side by side.
+  Output is streamed back as it is produced; the call returns when the command finishes,
+  or after a quiet period / wait_ms if it keeps running (e.g. a dev server — the session
+  stays alive). The session must already be open (terminal_open); otherwise this errors.
+  - Send an EMPTY command with wait_ms to simply wait for and fetch new output from a
+    still-running process.
+  - List sessions with list_sessions; close one with terminal_stop.
   WARNING: Dangerous commands will still execute — make sure the command is correct before running.`,
     {
       command: z
@@ -44,20 +59,100 @@ export function registerShellTools(server: McpServer) {
           "Execution timeout in milliseconds. Default: 30000 (30 seconds). Increase for long-running commands: npm install (60000), builds (120000), large git operations (180000)."
         ),
       shell: z
-        .enum(["powershell", "gitbash", "wsl"])
+        .enum(["powershell", "cmd", "gitbash", "wsl"])
         .optional()
         .describe(
-          'Shell to run the command in:\n- "powershell" (default): Native Windows PowerShell, best for Windows commands (Get-Process, Get-Service, registry, etc.)\n- "gitbash": Git Bash (C:\\Program Files\\Git\\bin\\bash.exe), use for Unix utilities (ls, grep, find, cat, sed, awk)\n- "wsl": Windows Subsystem for Linux, use for real Linux commands (apt, systemctl, docker on WSL, bash scripts)'
+          'Shell to run the command in:\n- "cmd" (default): classic Windows Command Prompt — fast and simple\n- "powershell": Native Windows PowerShell, best for Windows automation (Get-Process, Get-Service, registry, COM)\n- "gitbash": Git Bash (C:\\Program Files\\Git\\bin\\bash.exe), use for Unix utilities (ls, grep, find, cat, sed, awk)\n- "wsl": Windows Subsystem for Linux, use for real Linux commands (apt, systemctl, docker on WSL, bash scripts)'
+        ),
+      session_id: z
+        .string()
+        .optional()
+        .describe(
+          'STREAMING MODE. Pass a session id (any string, e.g. "dev-server") to run the command inside a PERSISTENT terminal session instead of spawning a new shell. The first call with this id opens the session; all later calls with the same id reuse it — same shell, same cwd, same environment. Use a different id to open an additional terminal side by side. Output streams back in real time. Default (absent): one-shot execution.'
+        ),
+      wait_ms: z
+        .number()
+        .optional()
+        .describe(
+          "STREAMING MODE ONLY. How long to wait for output before returning, in milliseconds. Default 30000. If the command finishes earlier it returns immediately. Pass an empty command with a wait_ms (e.g. 3000) to just block and fetch new output from a still-running process."
         ),
     },
-    async ({ command, cwd, timeout, shell = "powershell" }) => {
+    async ({ command, cwd, timeout, shell = "cmd", session_id, wait_ms }) => {
+      const blocked = isCommandBlocked(command);
+      if (blocked) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `BLOCKED: command contains a blocked pattern "${
+                blocked
+              }" and was not executed. See config_get for the blocked commands list.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (session_id) {
+        const session = getSession(session_id);
+        if (!session) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `ERROR: Session "${session_id}" is not open. Open it first with terminal_open(session_id="${session_id}", shell="${shell}", cwd="${cwd || "default"}"), then re-run this command.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        try {
+          const result = await sendCommandAndWait(session, command, {
+            waitMs: wait_ms ?? 30000,
+          });
+          const header = `[Session ${session.id} · ${session.shell} · ${session.cwd}]${
+            command.trim() ? ` > ${command.trim()}` : " (waiting for output)"
+          }`;
+          const statusNote =
+            result.status === "still-running"
+              ? "\nSTATUS: command may still be running — session stays alive. Call again (empty command + wait_ms) or use read_process_output for more.\n"
+              : result.status === "ended"
+                ? "\nSTATUS: session has ended.\n"
+                : result.status === "tail"
+                  ? "\n(no new output in the wait window)\n"
+                  : "\n";
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `${header}\n${statusNote}${result.output || "(no output)"}`,
+              },
+            ],
+          };
+        } catch (error: any) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `ERROR: ${error.message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
       try {
-        const result = await execAsync(buildShellCommand(command, shell), {
-          cwd: cwd || os.homedir(),
-          timeout: timeout || 30000,
-          shell: "powershell.exe",
-          maxBuffer: 1024 * 1024 * 10, // 10MB
-        });
+        // cmd is the default host (raw command); everything else is wrapped and
+        // executed through the PowerShell host, which can invoke bash/wsl/cmd.
+        const isCmdHost = shell === "cmd";
+        const result = await execAsync(
+          isCmdHost ? command : buildShellCommand(command, shell),
+          {
+            cwd: cwd || os.homedir(),
+            timeout: timeout || 30000,
+            shell: isCmdHost ? "cmd.exe" : "powershell.exe",
+            maxBuffer: 1024 * 1024 * 10, // 10MB
+          }
+        );
   
         return {
           content: [
@@ -113,6 +208,20 @@ export function registerShellTools(server: McpServer) {
         ),
     },
     async ({ command, cwd, timeout }) => {
+      const blocked = isCommandBlocked(command);
+      if (blocked) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `BLOCKED: command contains a blocked pattern "${
+                blocked
+              }" and was not executed. See config_get for the blocked commands list.`,
+            },
+          ],
+          isError: true,
+        };
+      }
       return new Promise((resolve) => {
         const child = spawn("powershell.exe", ["-Command", command], {
           cwd: cwd || os.homedir(),

@@ -5,7 +5,7 @@ description: Control a Windows PC via MCP tools — execute shell commands, read
 
 # PC Controller
 
-Control this Windows PC using the `pc-controller` MCP server (38 tools). All tools run via PowerShell on Windows 10/11.
+Control this Windows PC using the `pc-controller` MCP server (41 tools). Commands run via cmd (default), with PowerShell / Git Bash / WSL available on request.
 
 ## Command-First Principle
 
@@ -14,6 +14,35 @@ Control this Windows PC using the `pc-controller` MCP server (38 tools). All too
 Decision rule:
 1. Is there a dedicated tool that solves this in one obvious call? → use the tool
 2. Otherwise → use `run_command` (or `run_command_long` / `execute_code`)
+
+### Streaming sessions (reuse ONE terminal, realtime)
+
+For anything that needs **state across commands** — a dev server, watch/build loop, SSH,
+a database CLI — do NOT spawn a new shell per command. Open ONE persistent terminal with
+`session_id` and stream every later command through the same shell, realtime:
+
+```
+# STEP 1 — open the terminal (wait for the confirmation return)
+pc-controller:terminal_open(session_id="dev", title="OpenAI", cwd="C:\\Users\\<username>\\Projects\\app")
+# STEP 2 — stream commands into the open terminal
+pc-controller:run_command(command="npm run dev", session_id="dev")
+pc-controller:run_command(command="", session_id="dev", wait_ms=5000)   # block & fetch new output
+pc-controller:interact_with_process(session_id="dev", input="", wait_ms=2000)
+pc-controller:list_sessions()
+pc-controller:terminal_stop(session_id="dev")
+```
+
+Rules:
+- STEP 1: open the terminal with `terminal_open` and wait for its confirmation before
+  sending anything. STEP 2: every `run_command` call with the SAME id streams into that
+  open terminal — same shell, same cwd, same variables. The shell is NOT reopened per command.
+- `run_command` with a `session_id` that is NOT open returns an error: open it first.
+- Different `session_id` = a separate terminal, streamed side by side. Open as many as needed.
+- `shell` / `cwd` / `title` are fixed when the terminal opens; afterwards navigate with `cd`.
+- The terminal opens as a visible console window. Use `title` in `terminal_open` to customize its window title; if omitted, it defaults to `PC Controller - <session_id>`.
+- Close a session with `terminal_stop` (kills the whole process tree).
+- Idle auto-close: a session dies automatically after 10 minutes without ANY activity
+  (no output AND no input). Any streamed output or sent input resets the timer.
 
 ### Use tools when simple
 
@@ -73,7 +102,8 @@ pc-controller:execute_code(language="python", code="print(sum(range(1, 101)))")
 |------|---------|
 | `pc-controller:file_read` | Read file contents (supports offset/limit for line ranges, negative offset for tail) |
 | `pc-controller:file_write` | Write/create file (auto-creates parent dirs, overwrites) |
-| `pc-controller:file_edit` | Surgical search & replace — edit specific text without overwriting entire file |
+| `pc-controller:file_edit` | Surgical search & replace — edit specific text without overwriting the file (returns compact git-style diff; supports `dry_run` preview) |
+| `pc-controller:file_edit_batch` | Apply multiple surgical edits to one file in a single round-trip (per-edit diff; supports `dry_run` preview) |
 | `pc-controller:file_move` | Move or rename files/directories (auto-creates destination folders) |
 | `pc-controller:file_info` | Get file metadata — size, created/modified dates, read-only status |
 | `pc-controller:file_tail` | Read last N lines or bytes of a file (Unix tail equivalent) |
@@ -91,7 +121,7 @@ pc-controller:execute_code(language="python", code="print(sum(range(1, 101)))")
 ```
 pc-controller:file_read(path="C:\\Users\\<username>\\config.json")
 pc-controller:file_read(path="C:\\Users\\<username>\\logs\\app.log", offset=-100)  # last 100 lines
-pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_string="port: 3000", new_string="port: 8080")
+pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_text="port: 3000", new_text="port: 8080")
 pc-controller:file_move(source="C:\\Users\\<username>\\old.txt", destination="C:\\Users\\<username>\\archive\\old.txt")
 pc-controller:content_search(pattern="TODO", directory="C:\\Users\\<username>\\Projects\\src")
 pc-controller:preview_file(path="C:\\Users\\<username>\\Pictures\\photo.png")  # returns base64 image
@@ -144,11 +174,15 @@ pc-controller:process_kill(pid=1234)
 
 ### Terminal Sessions
 
+Sessions are **persistent streaming terminals** opened by `run_command` with a `session_id`
+(see above) — or long-running processes. Each has its own shell and stays alive between calls.
+
 | Tool | Purpose |
 |------|---------|
-| `pc-controller:list_sessions` | List active terminal sessions |
+| `pc-controller:list_sessions` | List active streaming terminal sessions |
 | `pc-controller:read_process_output` | Read output from sessions with offset/length pagination |
-| `pc-controller:interact_with_process` | Send input to running interactive processes |
+| `pc-controller:interact_with_process` | Send input to a running session (`wait_ms` to capture the response in the same call) |
+| `pc-controller:terminal_stop` | Stop a session and kill its process tree |
 
 ### Configuration & Monitoring
 
@@ -187,11 +221,15 @@ pc-controller:process_kill(pid=1234)
 3. `process_list(sort_by="cpu")` → find CPU hogs
 4. `run_command` → check disk, network
 
-### Code editing workflow
-1. `file_read` → read the file
-2. `content_search` → find the code to change
-3. `file_edit` → surgically replace text
-4. `file_read` → verify the change
+### Code editing workflow (agent-style)
+`file_edit` and `file_edit_batch` return a compact **git-style unified diff** of each
+change, so you verify the edit without a full re-read or a large payload. Both support
+`dry_run` to preview changes before writing. Use this loop:
+1. `file_read` (or `content_search`) → locate the exact text to change
+2. `file_edit` (or `file_edit_batch`) with `dry_run=true` → preview the diff, catch any
+   failed match before committing (anti-retry over a bridge/tunnel)
+3. Run the same call **without** `dry_run` to commit the change(s)
+4. Re-read only if you need more surrounding context than the returned diff
 
 ## Safety Rules
 

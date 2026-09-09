@@ -1,6 +1,6 @@
 # PC Controller Tools - Detailed Reference
 
-Complete parameter reference for all 37 tools in the pc-controller MCP server.
+Complete parameter reference for all 41 tools in the pc-controller MCP server.
 
 ---
 
@@ -16,12 +16,15 @@ Execute shell commands with timeout control. Default shell is PowerShell; Git Ba
 - `command` (string, required): Shell command to execute
 - `cwd` (string, optional): Working directory (absolute path). Default: user home directory
 - `timeout` (number, optional): Timeout in milliseconds. Default: 30000 (30s)
-- `shell` (string, optional): `"powershell"` (default), `"gitbash"`, or `"wsl"`
+- `shell` (string, optional): `"cmd"` (default), `"powershell"`, `"gitbash"`, or `"wsl"`
+- `session_id` (string, optional): **STREAMING MODE.** Pass any id (e.g. `"dev"`) to run inside an ALREADY-OPEN persistent terminal instead of a new shell. STEP 1: open the terminal with `terminal_open(session_id=...)`; STEP 2: every call with the same id reuses it — same shell, same cwd, same environment, output streamed realtime. A `session_id` that is not open returns an error. Each id = one independent terminal; open many side by side
+- `wait_ms` (number, optional): **STREAMING MODE ONLY.** Max time to wait for output before returning (default 30000). Returns immediately when the command finishes. With an EMPTY `command`, just blocks for new output (realtime tail)
 
 **Returns:** STDOUT and STDERR strings
 
 **Examples:**
 ```
+# one-shot (default) — spawns a fresh shell per call
 pc-controller:run_command(command="dir C:\\Users")
 pc-controller:run_command(command="npm install", cwd="C:\\Users\\<username>\\Projects\\app")
 pc-controller:run_command(command="ls -la", shell="gitbash")
@@ -29,11 +32,23 @@ pc-controller:run_command(command="grep -r 'TODO' src", cwd="C:\\Users\\<usernam
 pc-controller:run_command(command="df -h && free -m", shell="wsl")
 pc-controller:run_command(command="$w = New-Object -ComObject Word.Application; $d = $w.Documents.Open('C:\\Users\\<username>\\docs\\file.docx'); $d.Content.Text; $d.Close(); $w.Quit()")
 pc-controller:run_command(command="pdftotext C:\\Users\\<username>\\docs\\file.pdf -")  # requires poppler
+
+# STREAMING — two steps: open the terminal first, then stream commands into it
+pc-controller:terminal_open(session_id="dev", cwd="C:\\Users\\<username>\\Projects\\app")   # STEP 1: open
+pc-controller:run_command(command="npm run dev", session_id="dev")              # STEP 2: output streams realtime
+pc-controller:run_command(command="", session_id="dev", wait_ms=5000)           # block & fetch new output
+pc-controller:terminal_open(session_id="dev2", shell="gitbash")                 # second terminal, side by side
+pc-controller:run_command(command="git status", session_id="dev2")
 ```
 
 **Notes:**
 - `shell="gitbash"` uses `C:\Program Files\Git\bin\bash.exe` for Unix utilities
 - `shell="wsl"` uses `System32\bash.exe` (WSL default distro) for real Linux commands
+- Streaming mode: `shell`/`cwd` only apply when the session is first created; afterwards navigate with `cd`
+- Streaming mode: if the command keeps running (e.g. dev server), the call returns after `wait_ms`/a quiet period with output so far and the session stays alive
+- Streaming mode: the shell's prompt, echoed input, and completion markers are stripped from the returned output
+- Close a session with `terminal_stop`; list sessions with `list_sessions`
+- Idle auto-close: sessions die automatically after 10 minutes without any output or input; streamed output / sent input resets the timer
 - Dangerous commands will execute — verify before running
 
 ---
@@ -143,22 +158,66 @@ Surgical search & replace — edit specific text without overwriting the entire 
 
 **Parameters:**
 - `path` (string, required): Absolute file path
-- `old_string` (string, required): Exact text to find
-- `new_string` (string, required): Replacement text
+- `old_text` (string, required): Exact text to find
+- `new_text` (string, required): Replacement text
 - `replace_all` (boolean, optional): Replace all occurrences. Default: false
+- `dry_run` (boolean, optional): If true, preview the diff WITHOUT writing to disk. Default: false
 
-**Returns:** Confirmation with number of replacements
+**Returns:** Confirmation with number of replacements, plus a compact **git-style unified
+diff** of the change (with context) so the AI can verify the edit without a full re-read
+or a large payload. If `old_text` is not found, returns a helpful error listing nearby
+lines. Also returns `structuredContent` (path/executed/dryRun/replaced/diff).
 
 **Examples:**
 ```
-pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_string="port: 3000", new_string="port: 8080")
-pc-controller:file_edit(path="C:\\Users\\<username>\\Projects\\app\\src\\app.ts", old_string="const DEBUG = false", new_string="const DEBUG = true")
+pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_text="port: 3000", new_text="port: 8080")
+# Preview first without writing:
+pc-controller:file_edit(path="C:\\Users\\<username>\\config.json", old_text="port: 3000", new_text="port: 8080", dry_run=true)
+pc-controller:file_edit(path="C:\\Users\\<username>\\Projects\\app\\src\\app.ts", old_text="const DEBUG = false", new_text="const DEBUG = true")
 ```
 
 **Notes:**
-- `old_string` must match exactly (including whitespace)
-- Fails if `old_string` is not found or matches multiple times (unless replace_all)
+- Use `dry_run=true` first to catch a failed match before committing (avoids retry loops over a bridge/tunnel)
+- `old_text` must match exactly (including whitespace)
+- Fails if `old_text` is not found (returns nearby lines to help correct the search) or matches multiple times (unless replace_all)
 - Safer than file_write for small changes
+- For several small edits to one file, use `file_edit_batch` instead of calling this repeatedly
+
+---
+
+### 6b. file_edit_batch
+
+Apply multiple surgical search & replace edits to a single file in one round-trip,
+applied in order. Each `old_text` must match the file's state AFTER the prior edits.
+
+**Parameters:**
+- `path` (string, required): Absolute file path
+- `edits` (array, required): List of edits, each with:
+  - `old_text` (string, required): Exact text to find
+  - `new_text` (string, required): Replacement text
+  - `replace_all` (boolean, optional): Replace all occurrences. Default: false
+- `dry_run` (boolean, optional): If true, preview all diffs WITHOUT writing. Default: false
+
+**Returns:** Per-edit git-style unified diffs. Non-atomic: if one edit fails, the others
+are still applied and failures are listed. Also returns `structuredContent`
+(path/executed/dryRun/edits[] with per-edit status, replaced count, diff).
+
+**Examples:**
+```
+# Preview a whole batch first (nothing written):
+pc-controller:file_edit_batch(path="C:\\Users\\<username>\\Projects\\app\\src\\config.ts", dry_run=true,
+  edits=[{old_text="port: 3000", new_text="port: 8080"},
+         {old_text="host: localhost", new_text="host: 127.0.0.1"}])
+# Commit it:
+pc-controller:file_edit_batch(path="C:\\Users\\<username>\\Projects\\app\\src\\config.ts",
+  edits=[{old_text="port: 3000", new_text="port: 8080"},
+         {old_text="host: localhost", new_text="host: 127.0.0.1"}])
+```
+
+**Notes:**
+- Edits run sequentially on the same file; later edits see earlier changes
+- Use `dry_run=true` first to catch failed matches before committing (anti-retry over a bridge/tunnel)
+- Use this to make many small changes to a file without re-reading between edits
 
 ---
 
@@ -593,13 +652,18 @@ pc-controller:notify(title="Build Finished", message="npm run build completed su
 
 ## Terminal Sessions
 
+Sessions are **persistent streaming terminals**: open one with `terminal_open(session_id="...")`
+(step 1) and reuse it across `run_command(session_id=...)` calls (step 2) — same shell, same cwd,
+same variables, realtime output. Every `session_id` is an independent terminal, so several streams
+can run side by side. Sessions auto-close after 10 minutes without any output or input.
+
 ### 30. list_sessions
 
 List all active terminal sessions managed by this server.
 
 **Parameters:** None
 
-**Returns:** Session IDs, creation times, output line counts, alive status
+**Returns:** Session IDs, shell type, working directory, creation times, output line counts, alive status
 
 **Examples:**
 ```
@@ -629,19 +693,57 @@ pc-controller:read_process_output(session_id="session-1", offset=50, length=20)
 
 ### 32. interact_with_process
 
-Send input to a running interactive process (SSH, database CLIs, dev servers).
+Send input to a running interactive session (SSH, database CLIs, dev servers, prompts).
 
 **Parameters:**
 - `session_id` (string, required): Session ID from list_sessions
 - `input` (string, required): Input to send to the process
+- `wait_ms` (number, optional): Milliseconds to wait for fresh output after sending (default 0 = send only). Use e.g. 2000-5000 to capture the response in the same call — real-time interaction
 
-**Returns:** Confirmation message
+**Returns:** Confirmation message; with `wait_ms`, also the fresh output produced after the input
 
 **Examples:**
 ```
 pc-controller:interact_with_process(session_id="session-1", input="ls -la")
 pc-controller:interact_with_process(session_id="session-1", input="SELECT * FROM users;")
-pc-controller:interact_with_process(session_id="session-1", input="y")
+pc-controller:interact_with_process(session_id="session-1", input="y", wait_ms=3000)  # wait for the response
+```
+
+---
+
+### 40. terminal_stop
+
+Stop a persistent streaming session and kill its process tree (including child processes such as a running dev server). The session is removed; reopen it with `terminal_open` when needed again.
+
+**Parameters:**
+- `session_id` (string, required): Session ID to stop
+
+**Returns:** Confirmation message
+
+**Examples:**
+```
+pc-controller:terminal_stop(session_id="dev")
+```
+
+---
+
+### 41. terminal_open
+
+STEP 1 of the streaming flow: open a VISIBLE persistent streaming terminal session and keep it alive for subsequent commands. Returns a confirmation when the terminal is ready; afterwards send commands with `run_command(session_id=...)`. The shell stays alive between calls (same process, same cwd, same variables) and output is streamed back in real time. Each `session_id` is an independent visible terminal; the shell, cwd, and title are fixed when the terminal opens (navigate later with `cd`). Sessions auto-close after 10 minutes without any output or input.
+
+**Parameters:**
+- `session_id` (string, required): Any id to identify this terminal, e.g. `"dev"`, `"build"`, `"db"` — a different id opens a separate terminal
+- `shell` (string, optional): `"cmd"` (default), `"powershell"`, `"gitbash"`, or `"wsl"`
+- `cwd` (string, optional): Working directory when the terminal opens. Default: user home directory
+- `title` (string, optional): Visible console window title, e.g. `"OpenAI"`. Default: `"PC Controller - <session_id>"`
+
+**Returns:** Confirmation with session id, shell, title, and cwd
+
+**Examples:**
+```
+pc-controller:terminal_open(session_id="dev", title="OpenAI", cwd="C:\\Users\\<username>\\Projects\\app")
+pc-controller:terminal_open(session_id="db", shell="powershell", title="Database")
+pc-controller:terminal_open(session_id="linux", shell="wsl", title="Linux shell")
 ```
 
 ---
